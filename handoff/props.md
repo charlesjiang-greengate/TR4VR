@@ -1,0 +1,8 @@
+# JL-TASK P — prop realism (`src/ext_props.js`, `assets/props/`)
+Status: READY
+Adds: `extPre` wrappers for `arch.stoneLantern`, `arch.brazier`, `nature.guardianLion`, `nature.dragonIdol`, `nature.pedestal`. Original builders still run (userData, footprint, colliders unchanged); their M.stone / M.darkStone / M.gold / M.bronze meshes get object-space triplanar PBR materials (albedo + normal + roughness, moss on up-faces, ground grime, verdigris/tarnish patina) plus small bevel/bead mouldings (lantern beads, pedestal + lion plinth chamfers, brazier rolled rim). 4 shared materials, 1 shader program, ~14 extra small meshes per prop type, no per-frame work.
+Assets (1.1 MB total): assets/props/stone_d.jpg 289 KB, stone_n.jpg 226 KB, stone_r.jpg 126 KB, metal_d.jpg 212 KB, metal_n.jpg 121 KB, metal_r.jpg 124 KB (all 1024², .jpg so no build rewrite needed).
+Sources/licences: Poly Haven CC0 — marble_rock_01 (stone_*, re-encoded) and green_metal_rust (metal_*), 1k diff / nor_gl / rough.
+Fallback: 1×1 neutral textures until/unless the JPGs load, so a 404 leaves plain tinted PBR props; everything is try/catch wrapped.
+Known issues: jade/paper/moss/coal parts untouched; stone veining is fairly contrasty up close; idol gold only seen from a distance in snapshots; mouldings are simple chamfers, not full re-models.
+Snapshots: yes — built and ran tools/snap.js (gate, idol court, pool lantern, lion close-up): no console errors, props render textured.
