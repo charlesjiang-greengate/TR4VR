@@ -176,5 +176,6 @@ window.createHeroine2 = function (THREE) {
   api = { group: group, update: update, setVariant: setVariant, height: 1.62 };
   api._dbg = function () { return 'inst=' + Object.keys(inst).join(',') + ' loading=' + Object.keys(loading).join(',') + ' variant=' + variant + ' fallback=' + !!fallback + ' pivot=' + pivot.children.length; };
   ensure(variant);
+  setTimeout(function () { ensure(variant === 'elder' ? 'younger' : 'elder'); }, 2500);   // preload the other sister so switching is instant
   return api;
 };
