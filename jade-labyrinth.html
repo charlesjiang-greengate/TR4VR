@@ -2550,11 +2550,13 @@ window.JL = {};
   renderer.toneMapping = T.NoToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = T.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const scene = new T.Scene();
   const camera = new T.PerspectiveCamera(58, 1, 0.12, 900);
 
   const M = JL.makeMaterials(aniso, lowQ);
+  M.redLacquer.color.setRGB(0.50, 0.075, 0.045); M.redLacquer.roughness = 0.42;
   const arch = window.createArchProps ? window.createArchProps(T, M) : {};
   const nature = window.createNatureProps ? window.createNatureProps(T, M) : {};
   const prop = (lib, name, ...a) => { try { if (lib[name]) return lib[name](...a); } catch (e) { console.warn('prop', name, e); } return new T.Group(); };
@@ -2706,7 +2708,7 @@ window.JL = {};
       const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(p, 3)); geo.setIndex(idx);
       const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color, side: T.DoubleSide })); m.position.copy(center); backdrop.add(m);
     };
-    ring(170, 28, 62, 0x0e1a1c, 3); ring(250, 55, 120, 0x152a33, 4); ring(340, 90, 190, 0x1f3f4f, 5);
+    ring(170, 12, 34, new T.Color(0.085, 0.12, 0.15), 3); ring(250, 30, 72, new T.Color(0.15, 0.20, 0.25), 4); ring(340, 55, 125, new T.Color(0.24, 0.30, 0.36), 5);
   }
 
   // ---------- props & lights ----------
@@ -3108,6 +3110,7 @@ window.JL = {};
     hs.state = pl.state; hs.speed = Math.hypot(pl.vel.x, pl.vel.z); hs.vy = pl.vel.y; hs.climbT = clamp(pl.climbT, 0, 1); hs.t = time;
     try { heroine.update(dt, hs); } catch (e) { if (!frame.err) { frame.err = 1; console.error('heroine.update', e); } }
     updateCamera(dt); updateLights();
+    renderer.shadowMap.needsUpdate = ((window.__frames | 0) & 1) === 0 || window.JL_MANUAL === 1;
     petals.material.uniforms.time.value = time; petals.material.uniforms.origin.value.set(camTarget.x, 6, camTarget.z);
     motes.material.uniforms.time.value = time; flameFx.material.uniforms.time.value = time; sky.material.uniforms.time.value = time;
     sky.position.copy(camera.position);
