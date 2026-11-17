@@ -2857,7 +2857,7 @@ window.JL = {};
 
   // ---------- heroine ----------
   let heroine;
-  try { heroine = (window.createHeroine2 || window.createHeroine)(T); } catch (e) { console.warn('heroine', e); }
+  try { heroine = (window.createHeroine3 || window.createHeroine2 || window.createHeroine)(T); } catch (e) { console.warn('heroine', e); }
   if (!heroine) { const g = new T.Group(); const m = new T.Mesh(new T.CapsuleGeometry(0.3, 1.1, 4, 12), M.redLacquer); m.position.y = 0.85; m.castShadow = true; g.add(m); heroine = { group: g, update() { } }; }
   scene.add(heroine.group);
 
