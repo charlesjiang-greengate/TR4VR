@@ -5,6 +5,8 @@
      younger = Assets/Avatars/Children/Female_Child_01 (top recoloured pale pink, trousers light grey, hair blackened)
      clips   = Assets/Animations/.../f_idle_neutral_01, f_walk_neutral_01, f_run_fast_01 (root motion stripped at load)
    FBX -> GLB via FBX2glTF, TGA -> JPG/PNG 1024 px. Files live in assets/char2/.
+   Rocketbox has no jump / fall / climb clips, so those are a procedural layer in this file (see "animation" below):
+   authored key poses + analytic two-bone IK, hands pinned to the real ledge edge (read from JL.ctx.pl.climb / colliders).
    Contract: window.createHeroine2(THREE) -> { group, update(dt, s), setVariant('elder'|'younger'), height }
    Falls back to window.createHeroine (heroine.js) if anything fails to load. */
 window.createHeroine2 = function (THREE) {
@@ -167,17 +169,17 @@ window.createHeroine2 = function (THREE) {
   var POSE = {
     // running jump: leap off the stance leg, lead knee drives up, opposite arm forward
     rPush: mkPose([40, 80, 2, 25], [-22, 8, 2, 45], [[0.25, -0.75, -0.6], [0.0, -0.9, 0.4]], [[0.1, -0.6, 0.8], [-0.15, 0.55, 0.8]], 0.14),
-    rRise: mkPose([62, 95, 2, 20], [-28, 30, 2, 40], [[0.3, -0.7, -0.65], [0.1, -0.75, 0.6]], [[0.15, -0.2, 0.97], [-0.25, 0.85, 0.45]], 0.16),
+    rRise: mkPose([70, 100, 2, 20], [-30, 25, 2, 40], [[0.3, -0.7, -0.65], [0.1, -0.75, 0.6]], [[0.15, -0.2, 0.97], [-0.25, 0.85, 0.45]], 0.16),
     rApex: mkPose([50, 75, 3, 15], [12, 70, 3, 30], [[0.75, -0.6, -0.05], [0.5, -0.25, 0.8]], [[0.6, -0.5, 0.6], [0.3, 0.2, 0.9]], 0.10),
-    rFall: mkPose([32, 22, 3, -5], [-5, 35, 3, 25], [[0.85, -0.4, -0.1], [0.55, 0.5, 0.65]], [[0.8, -0.35, 0.35], [0.5, 0.6, 0.6]], 0.02),
+    rFall: mkPose([32, 22, 3, -5], [-5, 35, 3, 25], [[0.8, -0.5, -0.1], [0.75, 0.35, 0.35]], [[0.8, -0.5, 0.2], [0.7, 0.4, 0.45]], 0.02),
     // standing jump: two-foot take-off, arms swing up together, soft tuck at the apex
     sPush: mkPose([3, 6, 3, 45], [3, 6, 3, 45], [[0.2, -0.5, 0.85], [0.0, 0.25, 0.95]], [[0.2, -0.5, 0.85], [0.0, 0.25, 0.95]], 0.05),
     sRise: mkPose([12, 28, 4, 40], [6, 24, 4, 40], [[0.25, 0.3, 0.9], [0.0, 0.9, 0.4]], [[0.25, 0.3, 0.9], [0.0, 0.9, 0.4]], 0.03),
     sApex: mkPose([48, 85, 6, 25], [42, 80, 6, 25], [[0.6, -0.4, 0.7], [0.25, 0.3, 0.9]], [[0.6, -0.4, 0.7], [0.25, 0.3, 0.9]], 0.12),
-    sFall: mkPose([18, 28, 7, 8], [14, 24, 7, 8], [[0.85, -0.3, 0.2], [0.6, 0.55, 0.55]], [[0.85, -0.3, 0.2], [0.6, 0.55, 0.55]], 0.04),
+    sFall: mkPose([18, 28, 7, 8], [14, 24, 7, 8], [[0.82, -0.45, 0.15], [0.7, 0.4, 0.45]], [[0.82, -0.45, 0.15], [0.7, 0.4, 0.45]], 0.04),
     // ledge climb, limbs that are not pinned: hanging legs / reaching arms, then trailing leg + balance arms
     cHang: mkPose([14, 30, 3, 30], [6, 18, 3, 35], [[0.25, -0.55, 0.8], [0.0, 0.5, 0.85]], [[0.25, -0.55, 0.8], [0.0, 0.5, 0.85]], 0),
-    cUp: mkPose([40, 60, 3, 0], [-12, 25, 3, 35], [[0.3, -0.85, 0.3], [0.05, -0.45, 0.9]], [[0.3, -0.85, 0.3], [0.05, -0.45, 0.9]], 0)
+    cUp: mkPose([40, 60, 3, 0], [-12, 25, 3, 35], [[0.22, -0.92, -0.2], [0.12, -0.9, 0.3]], [[0.22, -0.92, -0.2], [0.12, -0.9, 0.3]], 0)
   };
   var des = new Float32Array(30);
   function addPose(p, w) { if (w > 1e-4) for (var i = 0; i < 30; i++) des[i] += p[i] * w; }
@@ -224,7 +226,7 @@ window.createHeroine2 = function (THREE) {
     vA.setFromMatrixPosition(L.up.matrixWorld); vB.setFromMatrixPosition(L.lo.matrixWorld); vC.setFromMatrixPosition(L.end.matrixWorld);
     vT.subVectors(vC, vA).applyQuaternion(qGi).multiplyScalar(1 / (L.l1 + L.l2));
     o[0] = vT.x * L.side; o[1] = vT.y; o[2] = vT.z;
-    vT.subVectors(vB, vA).applyQuaternion(qGi).normalize();
+    vB.subVectors(vC, vA).normalize(); vT.setFromMatrixColumn(L.up.matrixWorld, 2).normalize().cross(vB).applyQuaternion(qGi);   // bend-plane direction (exact even for a straight limb)
     o[3] = vT.x * L.side; o[4] = vT.y; o[5] = vT.z;
     if (L.leg) { vT.setFromMatrixPosition(L.tip.matrixWorld).sub(vC).applyQuaternion(qGi); o[6] = Math.atan2(-vT.y, Math.hypot(vT.x, vT.z)) - I.toeRest; } else o[6] = 0;
   }
@@ -255,7 +257,7 @@ window.createHeroine2 = function (THREE) {
 
   // ---- shared animation state (one heroine on screen) ----
   var A = { ovL: 0, ovA: 0, fadeL: 0.15, fadeA: 0.25, wasAir: false, airT: 0, tuck: 1, lead: 0, runK: 0, lastVy: 0, lean: 0, headP: 0,
-    landT: 9, landAmp: 0, landRun: 0, wasClimb: false, cRef: null, c: null, plant: [0, 0], handUse: 1, dipNow: 0, hT: [new THREE.Vector3(), new THREE.Vector3()] };
+    landT: 9, landAmp: 0, landRun: 0, wasClimb: false, I: null, engT: 9, cRef: null, c: null, plant: [0, 0], handUse: 1, dipNow: 0, hT: [new THREE.Vector3(), new THREE.Vector3()] };
   var dead = 0, lean = 0, lastYaw = null;
   function newClimb() { return { fx: 0, fy: 0, fz: 0, dx: 0, dz: 1, h: 1.7, d: 0.34, dl: 0.34, dr: 0.34, lead: 1, synth: false }; }
   var CB = newClimb();
@@ -292,7 +294,7 @@ window.createHeroine2 = function (THREE) {
       for (n = 0; n < 7; n++) L.cur[n] = mixf(L.tmp[n], L.cur[n], w);
     }
     if (A.ovL < 0.02) { A.lean = 0; A.headP = 0; }
-    A.ovL = A.ovA = 1;
+    A.ovL = A.ovA = 1; A.engT = 0;
   }
   // world position of a point given in the climb's start frame (x = her left, y = up from the start height, z = forward)
   function cPoint(o, x, y, z) { var c = A.c; return o.set(c.fx + c.dz * x + c.dx * z, c.fy + y, c.fz - c.dx * x + c.dz * z); }
@@ -325,6 +327,9 @@ window.createHeroine2 = function (THREE) {
     rot(I.spine, 0, 0, 1, lean);
     if (!rigOK) { A.wasAir = inAir; return; }
 
+    if (A.I !== I) {                            // sister switched: restart the layer on the new skeleton
+      A.I = I; if (A.ovL > 0 || A.ovA > 0) { A.ovL = A.ovA = 0; A.wasAir = false; A.wasClimb = false; A.landT = 9; }
+    }
     var legLen = I.legLen, armLen = I.armLen, K = I.k, c = A.c, t = cl(s.climbT || 0);
     // ---------- state transitions ----------
     if (inAir && !A.wasAir) {
@@ -334,7 +339,8 @@ window.createHeroine2 = function (THREE) {
         var a0 = I.limbs[0].tmp, a1 = I.limbs[1].tmp; A.lead = (a0[2] + 0.5 * a0[1] >= a1[2] + 0.5 * a1[1]) ? 0 : 1;
       }
     }
-    if (inClimb && (!A.wasClimb || (s.climb || (window.JL && JL.ctx && JL.ctx.pl && JL.ctx.pl.climb) || A.cRef) !== A.cRef)) { engage(I); startClimb(I, s); c = A.c; A.plant[0] = A.plant[1] = 0; }
+    var J = window.JL, pcl = s.climb || (J && J.ctx && J.ctx.pl && J.ctx.pl.climb) || A.cRef;
+    if (inClimb && (!A.wasClimb || pcl !== A.cRef)) { engage(I); startClimb(I, s); c = A.c; A.plant[0] = A.plant[1] = 0; }
     if (landed) {
       A.landT = 0; A.landAmp = cl((-A.lastVy - 1.2) / 6.5); A.landRun = sm(1.5, 3.5, sp);
       A.fadeL = mixf(0.2, 0.12, A.landRun); A.fadeA = mixf(0.3, 0.2, A.landRun);
@@ -352,11 +358,12 @@ window.createHeroine2 = function (THREE) {
     var dip = land * legLen * mixf(0.21, 0.09, A.landRun);
 
     // ---------- desired limb targets ----------
-    var gk = 1 - Math.exp(-dt * 17), leanT = 0, headT = 0, pvY = 0, pvZ = 0, hipRel = 0, shRel = 0, cy = 0, cz = 0;
+    A.engT += dt;
+    var gk = 1 - Math.exp(-dt * 17 * (0.3 + 0.7 * sm(0, 0.09, A.engT))), leanT = 0, headT = 0, pvY = 0, pvZ = 0, hipRel = 0, shRel = 0, cy = 0, cz = 0;
     if (inAir) {
       for (i = 0; i < 30; i++) des[i] = 0;
       var p = Math.max(-1.4, Math.min(1, vy / 6.7));
-      var wR = sm(0.05, 0.65, p), wF = sm(0, 0.6, -p), wA = 1 - wR - wF, wP = A.tuck * (1 - sm(0.04, 0.13, A.airT));
+      var wR = sm(0.0, 0.55, p), wF = sm(0, 0.6, -p), wA = 1 - wR - wF, wP = A.tuck * (1 - sm(0.04, 0.13, A.airT));
       wF += (wA + wR) * (1 - A.tuck); wA *= A.tuck; wR *= A.tuck;
       var rk = A.runK, q1 = 1 - wP;
       addPose(POSE.rPush, wP * rk); addPose(POSE.rRise, q1 * wR * rk); addPose(POSE.rApex, q1 * wA * rk); addPose(POSE.rFall, q1 * wF * rk);
@@ -364,7 +371,8 @@ window.createHeroine2 = function (THREE) {
       leanT = des[28]; headT = des[29];
     } else if (inClimb) {
       for (i = 0; i < 30; i++) des[i] = 0;
-      var ku = sm(0.4, 0.6, t); addPose(POSE.cHang, 1 - ku); addPose(POSE.cUp, ku);
+      var ku = sm(0.4, 0.6, t), kuA = A.handUse ? sm(0.15, 0.33, t) : 1; addPose(POSE.cHang, 1 - ku); addPose(POSE.cUp, ku);
+      for (i = 14; i < 28; i++) des[i] = mixf(POSE.cHang[i], POSE.cUp[i], kuA);      // arms let go earlier than the legs change
       cy = group.position.y - c.fy; cz = (group.position.x - c.fx) * c.dx + (group.position.z - c.fz) * c.dz;
       if (c.synth) cy = c.h * sm(0, 0.6, t);
       var gIn = sm(0, 0.14, t);
@@ -372,7 +380,7 @@ window.createHeroine2 = function (THREE) {
       // hips: hang under the hands, hold at ledge level while the arms press (support), crouch over the planted foot, stand up.
       // The capsule rises faster than a body can, so the visual pelvis is held back (never above where standing would put it).
       var hipS = I.hipY + cy - c.h, c0 = A.handUse ? 0.0 : 0.62 * legLen, c1 = A.handUse ? 0.5 * legLen : 0.62 * legLen;
-      var cap = c0 + (c1 - c0) * sm(0.36, 0.6, t) + (I.hipY + 0.3 * K - c1) * sm(0.6, 0.98, t);
+      var cap = c0 + (c1 - c0) * sm(0.3, 0.6, t) + (I.hipY + 0.3 * K - c1) * sm(0.6, 0.98, t);
       pvY = (smin(hipS, cap, 0.12 * K) - hipS) * gIn;
       // catch: if the edge is out of reach, hop up to it (visual only), settling as the capsule rises
       var hz = c.d - pvZ - I.shZ, vr = 0.97 * armLen, need = (c.h - cy + 0.03 * K) - (I.shY + pvY + Math.sqrt(Math.max(0.01, vr * vr - hz * hz)));
@@ -411,12 +419,11 @@ window.createHeroine2 = function (THREE) {
         if (inClimb && L.leg) {
           var stp = I.stance[i], endY = c.h + stp.y, endZ = 0.68 + stp.z;
           if (isLead) {                         // lead foot: lift outside the face, over the lip, plant where she will stand
-            var w1 = sm(0.1, 0.38, t), w2 = sm(0.42, 0.6, t);
-            cPoint(vA, stp.x, c.h + 0.18 * K, c.d - 0.26 * K); vTg.lerp(vA, w1);
-            cPoint(vA, stp.x, endY + 0.07 * K * Math.sin(Math.PI * w2), endZ); vTg.lerp(vA, w2);
-            var kf = sm(-0.05 * K, 0.22 * K, hipRel);
-            vB.set(0.9 * (1 - kf) * L.side, 0.1, 0.25 + kf); vPo.lerp(vB, w1);
-            pitch = mixf(pitch, -0.3, w1); pitch = mixf(pitch, 0, w2);
+            var w1 = sm(0.1, 0.36, t), w2 = sm(0.42, 0.62, t);
+            vA.set(0.25 * L.side, -0.26, 0).multiplyScalar(len).applyQuaternion(qG).add(vR); vTg.lerp(vA, w1);   // knee out and up beside the hip
+            cPoint(vA, stp.x, endY + 0.22 * K * Math.sin(Math.PI * w2), endZ); vTg.lerp(vA, w2);
+            vB.set(0.9 * L.side, 0.2, 0.3); vPo.lerp(vB, w1); vB.set(0.1 * L.side, 0.1, 1); vPo.lerp(vB, w2);
+            pitch = mixf(pitch, -0.2, w1); pitch = mixf(pitch, 0, w2);
           } else {                              // trailing foot: tuck under the hip, swing through, plant
             var w3 = sm(0.56, 0.72, t), w4 = sm(0.76, 0.95, t);
             vA.set(0.03 * L.side, -0.42 * len, -0.03 * len).applyQuaternion(qG).add(vR); vTg.lerp(vA, w3);
@@ -425,10 +432,11 @@ window.createHeroine2 = function (THREE) {
             pitch = mixf(pitch, 0, w4);
           }
         } else if (inClimb) {                   // hands: pinned to the ledge edge while it is within reach
-          var hi = i - 2, press = sm(-0.1 * K, 0.25 * K, shRel), rel = hi === 1 ? 0.43 : 0.47;
+          var hi = i - 2, press = sm(-0.1 * K, 0.25 * K, shRel), rel = hi === 1 ? 0.34 : 0.37;
           cPoint(vA, (I.shX + 0.03 * K) * L.side, c.h + 0.028 * K, (hi === 0 ? c.dl : c.dr) + mixf(-0.025, 0.07, press) * K);
           var stretch = vA.distanceTo(vR) - 0.985 * len;
-          var pw = sm(0.02, 0.14, t) * (1 - sm(rel, rel + 0.12, t)) * (1 - sm(0.02 * len, 0.16 * len, stretch)) * A.handUse;
+          var pw = sm(0.0, 0.17, t) * (1 - sm(rel, rel + 0.16, t)) * (1 - sm(0.0, 0.3 * len, stretch)) * A.handUse;
+          var app = 1 - sm(0.0, 0.17, t); vA.y += 0.1 * K * app; vA.addScaledVector(vF.set(c.dx, 0, c.dz), -0.08 * K * app);   // arrive from above / outside the lip
           A.plant[hi] = plantW = pw;
           vTg.lerp(vA, plantW);
           vB.set(mixf(0.9, 0.45, press) * L.side, mixf(-0.4, 0.1, press), mixf(-0.1, -0.9, press)); vPo.lerp(vB, plantW);
