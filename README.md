@@ -6,6 +6,8 @@ to claim the Jade Dragon.
 
 Published artifact: https://claude.ai/artifact/R4Zz8QYELJTZWX5dpyNgV6
 
+> Picking this up again? Start with [`NEXT.md`](NEXT.md).
+
 ## Tech
 
 three.js r147 (UMD from jsDelivr) with a custom HDR pipeline (`src/gfx.js`):
