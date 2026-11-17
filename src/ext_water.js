@@ -18,11 +18,11 @@
     U.uRip = { value: rip };
     U.uTime = { value: 0 };
     U.uSunCol = { value: new T.Vector3(7.0, 5.2, 3.0) };
-    U.uScatter = { value: new T.Vector3(0.012, 0.085, 0.068) };
+    U.uScatter = { value: new T.Vector3(0.014, 0.105, 0.092) };
     U.uSkyTint = { value: new T.Vector3(0.20, 0.26, 0.30) };
     U.uDepth = { value: DEPTH };
     mat.lights = false; mat.fog = false;
-    mat.transparent = true; mat.depthWrite = false; mat.premultipliedAlpha = true; mat.side = T.FrontSide;
+    mat.transparent = true; mat.depthWrite = false; mat.side = T.FrontSide;
     mat.vertexShader = [
       'uniform mat4 textureMatrix;',
       'varying vec4 vMirror; varying vec3 vWorld;',
@@ -31,10 +31,10 @@
       '  vWorld = wp.xyz; vMirror = textureMatrix * wp;',
       '  gl_Position = projectionMatrix * viewMatrix * wp;',
       '}'].join('\n');
-    mat.fragmentShader = [
+    var frag = function (filter) { return [
       'precision highp float;',
       'uniform sampler2D mirrorSampler; uniform sampler2D normalSampler;',
-      'uniform vec3 eye; uniform vec3 sunDirection; uniform vec3 uSunCol; uniform vec3 uScatter; uniform vec3 uSkyTint;',
+      'uniform vec3 sunDirection; uniform vec3 uSunCol; uniform vec3 uScatter; uniform vec3 uSkyTint;',
       'uniform float uTime; uniform float uDepth;',
       'uniform vec4 uRip[' + NR + '];',
       'varying vec4 vMirror; varying vec3 vWorld;',
@@ -53,7 +53,7 @@
       '}',
       'void main(){',
       '  vec2 p = vWorld.xz; float t = uTime;',
-      '  vec3 V = eye - vWorld; float dist = length(V); V /= dist;',
+      '  vec3 V = cameraPosition - vWorld; float dist = length(V); V /= dist;',
       '  vec2 n1 = texture2D(normalSampler, p * 0.085 + vec2(t * 0.011, t * 0.007)).xy * 2.0 - 1.0;',
       '  vec2 n2 = texture2D(normalSampler, p * 0.19 + vec2(-t * 0.013, t * 0.016)).xy * 2.0 - 1.0;',
       '  vec2 n3 = texture2D(normalSampler, p * 0.47 + vec2(t * 0.021, -t * 0.018)).xy * 2.0 - 1.0;',
@@ -66,10 +66,14 @@
       '  vec2 muv = vMirror.xy / vMirror.w + N.xz * (0.04 + 0.9 / dist);',
       '  vec3 refl = texture2D(mirrorSampler, clamp(muv, 0.002, 0.998)).rgb;',
       '  refl = min(refl, vec3(24.0));',
+      // the hazy warm sky is very bright in HDR: soft-compress it and cool it so the pool reads as water, not olive
+      '  float lum = dot(refl, vec3(0.2126, 0.7152, 0.0722));',
+      '  refl *= 1.0 / (1.0 + lum * 0.45);',
+      '  refl = mix(refl, vec3(lum / (1.0 + lum * 0.45)) * vec3(0.62, 0.92, 1.08), 0.55);',
       // depth-tinted transmission: path length of the refracted ray down to the pool floor
       '  float sin2 = (1.0 - ndv * ndv) / 1.77; float cosT = sqrt(1.0 - sin2);',
       '  float path = uDepth / max(cosT, 0.2);',
-      '  vec3 ext = vec3(1.9, 0.62, 0.78);',
+      '  vec3 ext = vec3(3.0, 0.85, 1.1);',
       '  vec3 trans = exp(-ext * path);',
       '  float absorb = 1.0 - dot(trans, vec3(0.3333));',
       // caustic shimmer projected onto the floor under the surface
@@ -82,13 +86,39 @@
       '  vec3 H = normalize(V + L); float ndh = max(dot(N, H), 0.0);',
       '  vec3 spec = uSunCol * (pow(ndh, 900.0) * 3.0 + pow(ndh, 120.0) * 0.06);',
       '  float crest = clamp(length(rg) * 1.6, 0.0, 1.0);',
-      '  vec3 col = refl * F + under * (1.0 - F) + spec + uSkyTint * crest * 0.12;',
-      '  float a = clamp(F + (1.0 - F) * absorb + crest * 0.15, 0.0, 1.0);',
-      '  gl_FragColor = vec4(col, a);',
-      '}'].join('\n');
+      '  vec3 col = refl * F + under * (1.0 - F) + spec + uSkyTint * crest * 0.10;',
+      filter ? '  gl_FragColor = vec4(trans * (1.0 - F) * (1.0 - crest * 0.15), 1.0);' : '  gl_FragColor = vec4(col, 1.0);',
+      '}'].join('\n'); };
+    mat.fragmentShader = frag(false);
+    mat.blending = T.CustomBlending; mat.blendEquation = T.AddEquation; mat.blendSrc = T.OneFactor; mat.blendDst = T.OneFactor;
+    // pass 1 (child plane): multiplies what is under the surface by the per-channel transmission (real colour absorption)
+    var fmat = new T.ShaderMaterial({ uniforms: U, vertexShader: mat.vertexShader, fragmentShader: frag(true),
+      transparent: true, depthWrite: false, blending: T.MultiplyBlending });
+    var filt = new T.Mesh(w.geometry, fmat); filt.renderOrder = -2; filt.frustumCulled = false; w.add(filt);
     mat.needsUpdate = true;
     w.userData.ownTime = true;
-    w.renderOrder = 2;
+    w.renderOrder = -1;
+    // The base scene's outer ground disc (CircleGeometry r=420) lies at y=-0.25, exactly coplanar with the water and
+    // above the pool floor: it z-fights with the water and hides the pool bed (the "flat olive" look). Cut a pool-sized
+    // hole in it (runtime only, same height/material everywhere else).
+    try {
+      ctx.scene.children.forEach(function (o) {
+        var gp = o.isMesh && o.geometry && o.geometry.parameters;
+        if (!gp || o.geometry.type !== 'CircleGeometry' || !(gp.radius > 100) || Math.abs(o.position.y + 0.25) > 0.01) return;
+        try {
+          var sh = new T.Shape(); sh.absarc(0, 0, gp.radius, 0, Math.PI * 2, false);
+          var x0 = 23.85 - o.position.x, x1 = 44.15 - o.position.x, y0 = -(44.15 - o.position.z), y1 = -(23.85 - o.position.z);
+          var h = new T.Path(); h.moveTo(x0, y0); h.lineTo(x0, y1); h.lineTo(x1, y1); h.lineTo(x1, y0); h.closePath();
+          sh.holes.push(h);
+          var ng = new T.ShapeGeometry(sh, 24);
+          if (ng.attributes.position.count > 8) { o.geometry.dispose(); o.geometry = ng; } else o.position.y = -1.42;
+        } catch (e) { o.position.y = -1.42; }
+      });
+    } catch (e) { console.warn('ext_water ground', e); }
+    // Mirror pass is rendered from onUpdate (before the main render) instead of nested inside it: the nested render
+    // left the main pass' depth test in a bad state, so parts of the pool showed no water at all.
+    var mirrorRender = w.onBeforeRender, mirrorOk = true;
+    w.onBeforeRender = function () {};
     ctx.setWater(w);
 
     // ---------- koi (optional, cheap: 6 small meshes under the surface) ----------
@@ -112,6 +142,10 @@
     function emit(x, z, time, amp) { rip[ri].set(x, z, time, amp); ri = (ri + 1) % NR; }
     ctx.onUpdate(function (dt, time, pl) {
       U.uTime.value = time; if (U.time) U.time.value = time * 0.35;
+      if (mirrorOk) {
+        try { ctx.camera.updateMatrixWorld(); w.updateMatrixWorld(); mirrorRender.call(w, ctx.renderer, ctx.scene, ctx.camera); }
+        catch (e) { mirrorOk = false; w.visible = true; console.warn('ext_water mirror', e); }
+      }
       if (pl && pl.pos) {
         var px = pl.pos.x, pz = pl.pos.z;
         var inW = pl.pos.y < -0.3 && px > 24 && px < 44 && pz > 24 && pz < 44;
