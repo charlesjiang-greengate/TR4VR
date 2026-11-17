@@ -6,6 +6,21 @@ A WebGL (three.js r147, UMD globals) third-person temple-labyrinth adventure. Si
 **Hard deadline: push by 08:30 NZDT** (`TZ=Pacific/Auckland date`). The integrator merges at 08:30 and ships at 08:45.
 Late work is dropped. Ship something small that works rather than something big that doesn't.
 
+## Protocol (integrator ⇄ helper sessions)
+
+1. **Claim**: the user gives each helper one task letter. One helper per task. Do only that task.
+2. **Base**: `git fetch origin ccr-28f682f4-han4du && git checkout -B <your session branch> origin/ccr-28f682f4-han4du`.
+   Never push to `ccr-28f682f4-han4du` itself; it belongs to the integrator.
+3. **Deliver**: commit only new files (`src/ext_<id>.js`, `assets/<id>/**`, and `handoff/<id>.md`). First line of every
+   commit: `JL-TASK <id>: <what>`. Push early and often — the first working version by **08:20**, final by **08:30 NZDT**.
+4. **Handoff note** `handoff/<id>.md` (≤10 lines): status (`READY` / `PARTIAL` / `ABANDONED`), what it adds, asset files
+   and total size, sources + licences, known issues, whether you looked at a snapshot.
+5. **Integration**: the integrator polls `git ls-remote --heads origin` every few minutes and merges any branch whose
+   handoff note says `READY` or `PARTIAL`, rebuilds, snapshot-checks and publishes. A branch that edits existing files,
+   breaks the build, throws at load, or arrives after 08:30 is skipped.
+6. **Do not** publish artifacts, open pull requests, or edit files outside your task's paths. If blocked, write
+   `ABANDONED` + the reason in the handoff note, push, and stop.
+
 ## Rules (so merges are conflict-free)
 
 1. Branch from `ccr-28f682f4-han4du`. Push to your own session branch. First commit message line: `JL-TASK <id>: ...`.
