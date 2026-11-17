@@ -142,3 +142,26 @@ HTML=../jade-labyrinth.html OUT=/tmp W=560 H=360 STEPS='[{"name":"run","tp":[25,
 ```
 `JL.debug.sim(seconds, {fwd, right, jump, act, camYaw, to:[x,z]})` steps the game at 60 Hz without rendering; `snap.js`
 renders stills (software GL, one browser at a time, ~4 GB RAM each).
+
+## Round 2 (final push) — for the sessions that did W, B and P
+
+**Deadline: push by 08:44 NZDT** (merge 08:45, publish 08:50, hard stop 08:55). First `git fetch origin ccr-28f682f4-han4du &&
+git merge --no-edit FETCH_HEAD` into your session branch so you have the integrated build (your earlier work is in it).
+Same rules: only your own files, commits `JL-TASK <id>2: ...`, update your `handoff/<id>.md` (append a "Round 2" line), one
+snapshot check, then stop. Small and working beats ambitious.
+
+- **B2** (owner of `src/ext_backdrop.js`): the karst towers read as smooth green gumdrops. Make them photographic: steeper,
+  more irregular limestone silhouettes with vertical grey rock faces and vegetation only on tops/ledges, less saturated,
+  stronger aerial perspective (far ring nearly sky-coloured), and a soft mist layer at their feet. Check from the rooftop
+  view `{"name":"roof","tp":[62,3.6,22.5],"cam":[1.9,0.2]}` and the pool view `{"name":"pool","tp":[34,0,45.5],"cam":[3.3,0.22]}`.
+- **P2** (owner of `src/ext_props.js`, `assets/props/`): extend the same triplanar PBR treatment to the props that still look
+  like toys: `nature.rock` (flat green cap → real mossy boulder), `nature.lotus`, `nature.jadeSeal` (polished nephrite with
+  subtle veining, gold band), `arch.toriiGate` (weathered, slightly chipped vermilion lacquer with darker grime near the
+  ground and in joints — it is the most visible prop in the game), `arch.paperLantern` (visible ribs, warm translucent
+  paper). Keep emissive lanterns emissive. Views: `{"name":"start","tp":[34,0,68],"cam":[3.14,0.12]}`, `{"name":"court","tp":[25,0,45],"cam":[3.9,0.12]}`.
+- **W2** (owner of `src/ext_water.js`; add a NEW file `src/ext_atmo.js`): atmosphere that sells the light. (1) sun lens
+  glare: a soft additive screen-space flare/halo when the sun (direction `ctx.sunDir`) is on screen and not occluded
+  (ray test against `ctx.colliders`), (2) dust motes drifting inside the sunlit corridor shafts (GPU points, visible mainly
+  when looking toward the sun), (3) thin ground mist drifting over the pool court and treasure court at dusk (a few large
+  soft alpha cards, depthWrite false, fading near the camera), (4) splash particles when the player enters or wades in the
+  pool (`pl.pos.y < -0.3`, pool x,z ∈ [24,44]). ≤ 5 draw calls, no per-frame allocations, everything try/catch wrapped.

@@ -4360,7 +4360,7 @@ window.createHeroine2 = function (THREE) {
   function updateCamera(dt) {
     if (mode === 'title') {
       const t = time * 0.06;
-      camPos.set(33.0 + Math.sin(t) * 0.35, 1.5 + Math.sin(t * 1.7) * 0.08, 73.5); camTarget.set(33.4, 1.45, 62); pl.yaw = 0.3 + Math.sin(time * 0.25) * 0.12;
+      camPos.set(32.4 + Math.sin(t) * 0.25, 1.35 + Math.sin(t * 1.7) * 0.06, 71.55); camTarget.set(36.3, 1.0, 64); pl.yaw = 0.3 + Math.sin(time * 0.25) * 0.12;
       camera.position.copy(camPos); camera.lookAt(camTarget); return;
     }
     camPitch = clamp(camPitch, -0.55, 1.2);
