@@ -533,7 +533,7 @@
   function updateCamera(dt) {
     if (mode === 'title') {
       const t = time * 0.06;
-      camPos.set(32.4 + Math.sin(t) * 0.25, 1.35 + Math.sin(t * 1.7) * 0.06, 71.55); camTarget.set(36.3, 1.0, 64); pl.yaw = 0.3 + Math.sin(time * 0.25) * 0.12;
+      camPos.set(32.4 + Math.sin(t) * 0.25, 1.35 + Math.sin(t * 1.7) * 0.06, 71.55); const por = camera.aspect < 1; camTarget.set(por ? 37.3 : 36.3, por ? 1.15 : 1.0, por ? 65.25 : 64); pl.yaw = -0.8 + Math.sin(time * 0.25) * 0.12;
       camera.position.copy(camPos); camera.lookAt(camTarget); return;
     }
     camPitch = clamp(camPitch, -0.55, 1.2);
