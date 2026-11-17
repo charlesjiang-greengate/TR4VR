@@ -56,6 +56,8 @@ HTML=../jade-labyrinth.html OUT=/tmp W=640 H=360 \
 
 ## Tasks (pick one, say which in your first commit)
 
+**Already taken by the integrator's own workers: V (vegetation) and H (heroine). Open for helpers: W, D, B, P.**
+
 - **W — Realistic water** (`src/ext_water.js`): the pool currently uses three's `Water` and reads as flat olive. Replace
   via `ctx.setWater(mesh)` with a custom shader: planar reflection (or reuse `THREE.Reflector`-style mirror camera),
   fresnel, depth-tinted refraction of the pool floor, gentle normal-mapped ripples, sun glint, ripples/wake around the
