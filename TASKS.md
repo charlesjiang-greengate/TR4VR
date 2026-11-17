@@ -1,5 +1,7 @@
 # Jade Labyrinth — helper tasks
 
+> Status 08:25 NZDT: tasks W, B, P (helper sessions) and V, D, H (integrator workers) are all merged. Kept as a record of the protocol and the extension API.
+
 A WebGL (three.js r147, UMD globals) third-person temple-labyrinth adventure. Single page built from `src/` by
 `node build.js` → `jade-labyrinth.html`, published as a Claude artifact with `assets/**` alongside (loaded by relative URL).
 
@@ -100,3 +102,66 @@ HTML=../jade-labyrinth.html OUT=/tmp W=640 H=360 \
   avatars incl. East Asian women/girls plus animations (FBX → convert to GLB with npm `fbx2gltf`). The integrator has one
   worker trying this already in `src/heroine2.js`; coordinate by using `src/heroine3.js` + `window.createHeroine3` instead.
   Needs a real skinned, textured human model with idle/run/jump/fall/climb animation; no likeness of real people.
+
+## Task M — character movement (dedicated session, final push)
+
+**Deadline: push by 08:44 NZDT.** Integrator merges at 08:45 and publishes at 08:50. Hard stop 08:55.
+Unlike the other tasks, M edits existing files. Ownership for the final push:
+- **You own**: `src/heroine2.js` (the realistic Rocketbox sisters: model loading, animation, `setVariant`), `assets/char2/**`,
+  and in `src/game.js` ONLY the functions `updatePlayer`, `tryMantle`, `groundY`, `collideXZ`, `damage`, `die`, `updateCamera`
+  and the `// ---------- input ----------` block. The integrator will not touch those. Do not touch anything else in
+  `game.js` (level, entities, loop, hooks) or any other file. Do not commit `jade-labyrinth.html`.
+- Branch from `ccr-28f682f4-han4du`, push to your own session branch, commits prefixed `JL-TASK M:`, finish with
+  `handoff/movement.md` (READY / PARTIAL, what changed, what you verified). Push a working version early (by 08:36).
+
+Goal: make her move like a real person, not a sliding mannequin. In priority order:
+1. **Jump / fall / land** (currently a slowed run stride with arms out): anticipation, tucked airborne pose driven by `s.vy`,
+   extended fall, landing knee-bend recovery. Use real clips if Rocketbox has them (`Assets/Animations/*.fbx` in
+   microsoft/Microsoft-Rocketbox via raw.githubusercontent.com / media.githubusercontent.com; convert with npm `fbx2gltf`,
+   save as `assets/char2/a_<name>.glb`, reference as the quoted literal `'assets/char2/a_<name>.glb'`), else procedural
+   bone overrides on the Bip01 rig.
+2. **Ledge climb** driven by `s.climbT` 0..1 (0–0.6 the body rises from hang to chest-over-ledge, 0.5–1 steps forward onto
+   the top): hands on the ledge, pull, knee up, stand. Must line up with the position lerp in `updatePlayer`'s climb branch.
+3. **Locomotion**: no foot sliding (clip timeScale matched to ground speed for walk at 2.0 m/s and run at 5.4 m/s), smooth
+   idle→walk→run blends, lean into turns, quick turn-around without moonwalking, start/stop settle, wading (y < −0.35:
+   slower, higher knees), hurt flinch on damage, a readable `dead` collapse. Subtle idle life: breathing, weight shift, look.
+4. **Controller feel** in `updatePlayer`: responsive acceleration, variable jump height (short hop on tap), gentle air
+   control, landing does not kill momentum, camera follow with light smoothing and no jitter on steps. Keep jump reach
+   (apex ≈ 1.1 m, ≈ 3.4 m running jump) and mantle limits (≤ 1.95 m, never onto 5 m walls) or the level breaks.
+
+Contract (unchanged): `createHeroine2(THREE)` → `{ group, update(dt, s), setVariant('elder'|'younger'), height }`, group origin at
+feet facing +Z, `s = { state:'idle'|'run'|'jump'|'fall'|'climb'|'dead', speed, vy, climbT, t }`. You may add fields to `s`
+(e.g. `turn`, `wade`, `hurt`, `landed`) by setting them on `hs` — tell the integrator in the handoff note which line in the
+loop you need (`hs.xxx = ...`), or compute them inside `update` from the group's motion.
+
+Verify:
+```
+node build.js && cd tools && npm i three@0.147.0
+for t in t1 t2 t3 t4 t5; do node route/drive.js route/$t.js | grep -o "STUCK[^\"]*\|mode:win" ; done   # t2 and t4 must print mode:win, no STUCK
+HTML=../jade-labyrinth.html OUT=/tmp W=560 H=360 STEPS='[{"name":"run","tp":[25,0,45],"cam":[0.9,0.1],"js":"JSON.stringify(JL.debug.sim(0.6,{fwd:1,camYaw:1.57}))"},{"name":"jump","tp":[25,0,45],"cam":[0.9,0.1],"js":"JSON.stringify(JL.debug.sim(0.25,{fwd:1,jump:true,camYaw:1.57}))"}]' node snap.js
+```
+`JL.debug.sim(seconds, {fwd, right, jump, act, camYaw, to:[x,z]})` steps the game at 60 Hz without rendering; `snap.js`
+renders stills (software GL, one browser at a time, ~4 GB RAM each).
+
+## Round 2 (final push) — for the sessions that did W, B and P
+
+**Deadline: push by 08:44 NZDT** (merge 08:45, publish 08:50, hard stop 08:55). First `git fetch origin ccr-28f682f4-han4du &&
+git merge --no-edit FETCH_HEAD` into your session branch so you have the integrated build (your earlier work is in it).
+Same rules: only your own files, commits `JL-TASK <id>2: ...`, update your `handoff/<id>.md` (append a "Round 2" line), one
+snapshot check, then stop. Small and working beats ambitious.
+
+- **B2** (owner of `src/ext_backdrop.js`): the karst towers read as smooth green gumdrops. Make them photographic: steeper,
+  more irregular limestone silhouettes with vertical grey rock faces and vegetation only on tops/ledges, less saturated,
+  stronger aerial perspective (far ring nearly sky-coloured), and a soft mist layer at their feet. Check from the rooftop
+  view `{"name":"roof","tp":[62,3.6,22.5],"cam":[1.9,0.2]}` and the pool view `{"name":"pool","tp":[34,0,45.5],"cam":[3.3,0.22]}`.
+- **P2** (owner of `src/ext_props.js`, `assets/props/`): extend the same triplanar PBR treatment to the props that still look
+  like toys: `nature.rock` (flat green cap → real mossy boulder), `nature.lotus`, `nature.jadeSeal` (polished nephrite with
+  subtle veining, gold band), `arch.toriiGate` (weathered, slightly chipped vermilion lacquer with darker grime near the
+  ground and in joints — it is the most visible prop in the game), `arch.paperLantern` (visible ribs, warm translucent
+  paper). Keep emissive lanterns emissive. Views: `{"name":"start","tp":[34,0,68],"cam":[3.14,0.12]}`, `{"name":"court","tp":[25,0,45],"cam":[3.9,0.12]}`.
+- **W2** (owner of `src/ext_water.js`; add a NEW file `src/ext_atmo.js`): atmosphere that sells the light. (1) sun lens
+  glare: a soft additive screen-space flare/halo when the sun (direction `ctx.sunDir`) is on screen and not occluded
+  (ray test against `ctx.colliders`), (2) dust motes drifting inside the sunlit corridor shafts (GPU points, visible mainly
+  when looking toward the sun), (3) thin ground mist drifting over the pool court and treasure court at dusk (a few large
+  soft alpha cards, depthWrite false, fading near the camera), (4) splash particles when the player enters or wades in the
+  pool (`pl.pos.y < -0.3`, pool x,z ∈ [24,44]). ≤ 5 draw calls, no per-frame allocations, everything try/catch wrapped.

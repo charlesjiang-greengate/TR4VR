@@ -281,14 +281,14 @@
     }
     const im = new T.InstancedMesh(geo, mat, spots.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), cc = new T.Color();
     spots.forEach((s, i) => { const sc = 0.4 + rr() * 0.7; e.set(0, rr() * 6.28, 0); q.setFromEuler(e); m4.compose(new T.Vector3(s[0], -0.01, s[1]), q, new T.Vector3(sc, sc * (0.7 + rr() * 0.7), sc)); im.setMatrixAt(i, m4); cc.setHSL(0.19 + rr() * 0.08, 0.32, 0.34 + rr() * 0.22); im.setColorAt(i, cc); });
-    im.receiveShadow = true; scene.add(im);
+    im.receiveShadow = true; im.frustumCulled = false; scene.add(im);
     // fallen petals
     const pg = new T.CircleGeometry(0.04, 5); pg.rotateX(-Math.PI / 2);
     const pm = new T.MeshStandardMaterial({ color: 0xffc0d2, roughness: 0.8, side: T.DoubleSide });
     const src = [[21.3, 21.3, 4.5, 260], [46.7, 46.7, 4.5, 240], [34, 58, 6, 420], [34, 68, 5, 160], [18, 62, 5, 120], [48, 56, 5, 120]]; let tot = 0; src.forEach(s => tot += s[3]);
     const pim = new T.InstancedMesh(pg, pm, tot); let k = 0;
     src.forEach(s => { for (let i = 0; i < s[3]; i++) { const a = rr() * 6.28, d = Math.sqrt(rr()) * s[2]; const sc = 0.6 + rr() * 0.9; e.set((rr() - 0.5) * 0.3, rr() * 6.28, (rr() - 0.5) * 0.3); q.setFromEuler(e); m4.compose(new T.Vector3(s[0] + Math.cos(a) * d, 0.012 + rr() * 0.01, s[1] + Math.sin(a) * d), q, new T.Vector3(sc, 1, sc * 1.5)); pim.setMatrixAt(k, m4); cc.setHSL(0.94 + rr() * 0.04, 0.8, 0.72 + rr() * 0.15); pim.setColorAt(k++, cc); } });
-    pim.receiveShadow = true; scene.add(pim);
+    pim.receiveShadow = true; pim.frustumCulled = false; scene.add(pim);
   }
 
   // ---------- water ----------
@@ -389,6 +389,12 @@
     if (st === undefined) st = 0.45;
     for (let it = 0; it < 2; it++) for (const b of colliders) {
       if (b.off || b.y1 <= p.y + st || b.y0 >= p.y + 1.6) continue;
+      const bw = b.x1 - b.x0, bd = b.z1 - b.z0;
+      if (bw < 1.65 && bd < 1.65 && b.y1 - b.y0 < 4.5) { // small props collide as cylinders so the player slides around them
+        const ccx = (b.x0 + b.x1) / 2, ccz = (b.z0 + b.z1) / 2, R = Math.max(bw, bd) * 0.5 + r; let ex = p.x - ccx, ez = p.z - ccz; const e2 = ex * ex + ez * ez;
+        if (e2 < R * R) { if (e2 < 1e-6) { ex = 0.01; ez = 0.01; } const e = Math.sqrt(ex * ex + ez * ez); p.x = ccx + ex / e * R; p.z = ccz + ez / e * R; }
+        continue;
+      }
       const qx = clamp(p.x, b.x0, b.x1), qz = clamp(p.z, b.z0, b.z1), dx = p.x - qx, dz = p.z - qz, d2 = dx * dx + dz * dz;
       if (d2 >= r * r) continue;
       if (d2 > 1e-8) { const d = Math.sqrt(d2); p.x = qx + dx / d * r; p.z = qz + dz / d * r; }
@@ -527,7 +533,7 @@
   function updateCamera(dt) {
     if (mode === 'title') {
       const t = time * 0.06;
-      camPos.set(33.0 + Math.sin(t) * 0.35, 1.5 + Math.sin(t * 1.7) * 0.08, 73.5); camTarget.set(33.4, 1.45, 62); pl.yaw = 0.3 + Math.sin(time * 0.25) * 0.12;
+      camPos.set(32.4 + Math.sin(t) * 0.25, 1.35 + Math.sin(t * 1.7) * 0.06, 71.55); const por = camera.aspect < 1; camTarget.set(por ? 37.3 : 36.3, por ? 1.15 : 1.0, por ? 65.25 : 64); pl.yaw = -0.8 + Math.sin(time * 0.25) * 0.12;
       camera.position.copy(camPos); camera.lookAt(camTarget); return;
     }
     camPitch = clamp(camPitch, -0.55, 1.2);
@@ -593,7 +599,7 @@
     window.__frames = (window.__frames || 0) + 1;
     if (window.JL_NORENDER) return;
     if (!window.JL_MANUAL) requestAnimationFrame(frame);
-    const rdt = (now - last) / 1000; last = now; const dt = Math.min(0.05, rdt); time += dt;
+    const rdt = Math.max(0, (now - last) / 1000); last = now; const dt = Math.min(0.05, rdt); time += dt;
     updatePlayer(dt); updateEntities(dt);
     for (const f of extUpd) { try { f(dt, time, pl, camera); } catch (e) { if (!f.err) { f.err = 1; console.warn('ext update', e); } } }
     heroine.group.position.copy(pl.pos); heroine.group.rotation.y = pl.yaw;
