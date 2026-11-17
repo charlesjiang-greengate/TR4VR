@@ -1,6 +1,6 @@
 # Jade Labyrinth — helper tasks
 
-> Status 08:25 NZDT: tasks W, B, P (helper sessions) and V, D, H (integrator workers) are all merged. Kept as a record of the protocol and the extension API.
+> Status 08:42 NZDT: everything is merged — W, B, P and round 2 (W2, B2, P2), M (movement), and the integrator's V, D, H. Kept as a record of the protocol and the extension API.
 
 A WebGL (three.js r147, UMD globals) third-person temple-labyrinth adventure. Single page built from `src/` by
 `node build.js` → `jade-labyrinth.html`, published as a Claude artifact with `assets/**` alongside (loaded by relative URL).
