@@ -10,5 +10,6 @@ Known issues: koi only confirmed rendering at a 4x debug scale (at final size th
 reflected sky is deliberately tone-compressed/cooled. Snapshot-checked: yes (pool, sun-facing, in-water, wake ring).
 Round 2 (W2): adds `src/ext_atmo.js` (new file, no assets): occlusion-tested sun glare quad, sun-lit dust motes, drifting
 ground mist cards over the pool and treasure courts, splash droplets on entering/wading the pool. 4 draw calls.
-Snapshot-checked: splash, mist, pool view, no console warnings; glare re-tuned weaker after it washed out a sun-facing shot.
+Snapshot-checked: splash, mist, pool view, no console warnings. Glare is subtle: a sun-facing shot looks the same with it
+on and off (that view is already washed out by the base sky/fog, not by the glare). Motes not individually confirmed.
 Also note: my final round-1 water commit (33e82e9: koi clear of stones, stronger wake) was not in the 08:25 merge; it is in this branch.
