@@ -102,3 +102,43 @@ HTML=../jade-labyrinth.html OUT=/tmp W=640 H=360 \
   avatars incl. East Asian women/girls plus animations (FBX → convert to GLB with npm `fbx2gltf`). The integrator has one
   worker trying this already in `src/heroine2.js`; coordinate by using `src/heroine3.js` + `window.createHeroine3` instead.
   Needs a real skinned, textured human model with idle/run/jump/fall/climb animation; no likeness of real people.
+
+## Task M — character movement (dedicated session, final push)
+
+**Deadline: push by 08:44 NZDT.** Integrator merges at 08:45 and publishes at 08:50. Hard stop 08:55.
+Unlike the other tasks, M edits existing files. Ownership for the final push:
+- **You own**: `src/heroine2.js` (the realistic Rocketbox sisters: model loading, animation, `setVariant`), `assets/char2/**`,
+  and in `src/game.js` ONLY the functions `updatePlayer`, `tryMantle`, `groundY`, `collideXZ`, `damage`, `die`, `updateCamera`
+  and the `// ---------- input ----------` block. The integrator will not touch those. Do not touch anything else in
+  `game.js` (level, entities, loop, hooks) or any other file. Do not commit `jade-labyrinth.html`.
+- Branch from `ccr-28f682f4-han4du`, push to your own session branch, commits prefixed `JL-TASK M:`, finish with
+  `handoff/movement.md` (READY / PARTIAL, what changed, what you verified). Push a working version early (by 08:36).
+
+Goal: make her move like a real person, not a sliding mannequin. In priority order:
+1. **Jump / fall / land** (currently a slowed run stride with arms out): anticipation, tucked airborne pose driven by `s.vy`,
+   extended fall, landing knee-bend recovery. Use real clips if Rocketbox has them (`Assets/Animations/*.fbx` in
+   microsoft/Microsoft-Rocketbox via raw.githubusercontent.com / media.githubusercontent.com; convert with npm `fbx2gltf`,
+   save as `assets/char2/a_<name>.glb`, reference as the quoted literal `'assets/char2/a_<name>.glb'`), else procedural
+   bone overrides on the Bip01 rig.
+2. **Ledge climb** driven by `s.climbT` 0..1 (0–0.6 the body rises from hang to chest-over-ledge, 0.5–1 steps forward onto
+   the top): hands on the ledge, pull, knee up, stand. Must line up with the position lerp in `updatePlayer`'s climb branch.
+3. **Locomotion**: no foot sliding (clip timeScale matched to ground speed for walk at 2.0 m/s and run at 5.4 m/s), smooth
+   idle→walk→run blends, lean into turns, quick turn-around without moonwalking, start/stop settle, wading (y < −0.35:
+   slower, higher knees), hurt flinch on damage, a readable `dead` collapse. Subtle idle life: breathing, weight shift, look.
+4. **Controller feel** in `updatePlayer`: responsive acceleration, variable jump height (short hop on tap), gentle air
+   control, landing does not kill momentum, camera follow with light smoothing and no jitter on steps. Keep jump reach
+   (apex ≈ 1.1 m, ≈ 3.4 m running jump) and mantle limits (≤ 1.95 m, never onto 5 m walls) or the level breaks.
+
+Contract (unchanged): `createHeroine2(THREE)` → `{ group, update(dt, s), setVariant('elder'|'younger'), height }`, group origin at
+feet facing +Z, `s = { state:'idle'|'run'|'jump'|'fall'|'climb'|'dead', speed, vy, climbT, t }`. You may add fields to `s`
+(e.g. `turn`, `wade`, `hurt`, `landed`) by setting them on `hs` — tell the integrator in the handoff note which line in the
+loop you need (`hs.xxx = ...`), or compute them inside `update` from the group's motion.
+
+Verify:
+```
+node build.js && cd tools && npm i three@0.147.0
+for t in t1 t2 t3 t4 t5; do node route/drive.js route/$t.js | grep -o "STUCK[^\"]*\|mode:win" ; done   # t2 and t4 must print mode:win, no STUCK
+HTML=../jade-labyrinth.html OUT=/tmp W=560 H=360 STEPS='[{"name":"run","tp":[25,0,45],"cam":[0.9,0.1],"js":"JSON.stringify(JL.debug.sim(0.6,{fwd:1,camYaw:1.57}))"},{"name":"jump","tp":[25,0,45],"cam":[0.9,0.1],"js":"JSON.stringify(JL.debug.sim(0.25,{fwd:1,jump:true,camYaw:1.57}))"}]' node snap.js
+```
+`JL.debug.sim(seconds, {fwd, right, jump, act, camYaw, to:[x,z]})` steps the game at 60 Hz without rendering; `snap.js`
+renders stills (software GL, one browser at a time, ~4 GB RAM each).
