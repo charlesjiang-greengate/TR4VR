@@ -389,6 +389,12 @@
     if (st === undefined) st = 0.45;
     for (let it = 0; it < 2; it++) for (const b of colliders) {
       if (b.off || b.y1 <= p.y + st || b.y0 >= p.y + 1.6) continue;
+      const bw = b.x1 - b.x0, bd = b.z1 - b.z0;
+      if (bw < 1.65 && bd < 1.65 && b.y1 - b.y0 < 4.5) { // small props collide as cylinders so the player slides around them
+        const ccx = (b.x0 + b.x1) / 2, ccz = (b.z0 + b.z1) / 2, R = Math.max(bw, bd) * 0.5 + r; let ex = p.x - ccx, ez = p.z - ccz; const e2 = ex * ex + ez * ez;
+        if (e2 < R * R) { if (e2 < 1e-6) { ex = 0.01; ez = 0.01; } const e = Math.sqrt(ex * ex + ez * ez); p.x = ccx + ex / e * R; p.z = ccz + ez / e * R; }
+        continue;
+      }
       const qx = clamp(p.x, b.x0, b.x1), qz = clamp(p.z, b.z0, b.z1), dx = p.x - qx, dz = p.z - qz, d2 = dx * dx + dz * dz;
       if (d2 >= r * r) continue;
       if (d2 > 1e-8) { const d = Math.sqrt(d2); p.x = qx + dx / d * r; p.z = qz + dz / d * r; }
