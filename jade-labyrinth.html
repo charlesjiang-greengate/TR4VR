@@ -2789,7 +2789,7 @@ window.JL = {};
         for (let i = 0; i < n; i++) { const t = rr() * CELL, o = 0.14 + rr() * rr() * 0.5; spots.push(d[0] ? [d[0] > 0 ? x0 + CELL + o : x0 - o, z0 + t] : [x0 + t, d[1] > 0 ? z0 + CELL + o : z0 - o]); } });
     }
     const im = new T.InstancedMesh(geo, mat, spots.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), cc = new T.Color();
-    spots.forEach((s, i) => { const sc = 0.4 + rr() * 0.7; e.set(0, rr() * 6.28, 0); q.setFromEuler(e); m4.compose(new T.Vector3(s[0], -0.01, s[1]), q, new T.Vector3(sc, sc * (0.7 + rr() * 0.7), sc)); im.setMatrixAt(i, m4); cc.setHSL(0.20 + rr() * 0.09, 0.45, 0.5 + rr() * 0.3); im.setColorAt(i, cc); });
+    spots.forEach((s, i) => { const sc = 0.4 + rr() * 0.7; e.set(0, rr() * 6.28, 0); q.setFromEuler(e); m4.compose(new T.Vector3(s[0], -0.01, s[1]), q, new T.Vector3(sc, sc * (0.7 + rr() * 0.7), sc)); im.setMatrixAt(i, m4); cc.setHSL(0.19 + rr() * 0.08, 0.32, 0.34 + rr() * 0.22); im.setColorAt(i, cc); });
     im.receiveShadow = true; scene.add(im);
     // fallen petals
     const pg = new T.CircleGeometry(0.04, 5); pg.rotateX(-Math.PI / 2);
