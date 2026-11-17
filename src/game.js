@@ -66,6 +66,7 @@
   sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.06;
   scene.add(sun, sun.target);
   scene.add(new T.HemisphereLight(0x6f8fb0, 0x2a2018, 0.35));
+  if (JL.loadRealAssets) { try { JL.loadRealAssets(renderer, scene, M, sky, sunDir); } catch (e) { console.warn(e); } }
 
   // ---------- geometry builder ----------
   class GB {
@@ -101,9 +102,45 @@
       gStone.box(x0 - 0.09, -0.2, z0 - 0.09, x1 + 0.09, 1.15, z1 + 0.09);
       gPlaster.box(x0, 1.15, z0, x1, 4.45, z1);
       gWood.box(x0 - 0.06, 4.45, z0 - 0.06, x1 + 0.06, 4.72, z1 + 0.06, 1);
-      gTile.box(x0 - 0.32, 4.72, z0 - 0.32, x1 + 0.32, WALL_H, z1 + 0.32, 1);
       col(x0 - 0.09, -1, z0 - 0.09, x1 + 0.09, WALL_H, z1 + 0.09);
       c = c1 + 1;
+    }
+  }
+  // tiled gable roofs along the wall tops + timber posts on wall faces
+  {
+    const inW = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && MAP[r][c] === '#';
+    const ori = (c, r) => { const h = (inW(c - 1, r) ? 1 : 0) + (inW(c + 1, r) ? 1 : 0), v = (inW(c, r - 1) ? 1 : 0) + (inW(c, r + 1) ? 1 : 0); return h >= v ? 'H' : 'V'; };
+    const YE = 4.70, YR = 5.85, OV = 0.5;
+    const V3 = (x, y, z) => new T.Vector3(x, y, z);
+    const face = (gb, pts, uvs, hint) => {
+      const n = pts[1].clone().sub(pts[0]).cross(pts[pts.length - 1].clone().sub(pts[0])).normalize();
+      if (n.dot(hint) < 0) { pts.reverse(); uvs.reverse(); n.negate(); }
+      const k = gb.p.length / 3; pts.forEach((p, i) => { gb.p.push(p.x, p.y, p.z); gb.n.push(n.x, n.y, n.z); gb.u.push(uvs[i][0], uvs[i][1]); });
+      gb.i.push(k, k + 1, k + 2); if (pts.length === 4) gb.i.push(k, k + 2, k + 3);
+    };
+    const roof = (a0, a1, b0, b1, alongX) => {
+      // a = along ridge, b = across
+      const P = (a, y, b) => alongX ? V3(a, y, b) : V3(b, y, a);
+      const H = (a, y, b) => alongX ? V3(a, y, b) : V3(b, y, a);
+      const bc = (b0 + b1) / 2, e0 = b0 - OV, e1 = b1 + OV, A0 = a0 - OV, A1 = a1 + OV, sl = Math.hypot(e1 - bc, YR - YE);
+      face(gTile, [P(A0, YE, e1), P(A1, YE, e1), P(A1, YR, bc), P(A0, YR, bc)], [[A0, 0], [A1, 0], [A1, sl], [A0, sl]], H(0, 1, 1));
+      face(gTile, [P(A1, YE, e0), P(A0, YE, e0), P(A0, YR, bc), P(A1, YR, bc)], [[A1, 0], [A0, 0], [A0, sl], [A1, sl]], H(0, 1, -1));
+      face(gPlaster, [P(a0, YE, b1), P(a0, YE, b0), P(a0, YR - 0.2, bc)], [[b1 / 2, YE / 2], [b0 / 2, YE / 2], [bc / 2, YR / 2]], H(-1, 0, 0));
+      face(gPlaster, [P(a1, YE, b0), P(a1, YE, b1), P(a1, YR - 0.2, bc)], [[b0 / 2, YE / 2], [b1 / 2, YE / 2], [bc / 2, YR / 2]], H(1, 0, 0));
+      if (alongX) { gDark.box(A0, YR - 0.1, bc - 0.16, A1, YR + 0.14, bc + 0.16, 1); gWood.box(A0, YE - 0.1, e0, A1, YE, e1, 1); }
+      else { gDark.box(bc - 0.16, YR - 0.1, A0, bc + 0.16, YR + 0.14, A1, 1); gWood.box(e0, YE - 0.1, A0, e1, YE, A1, 1); }
+    };
+    for (let r = 0; r < ROWS; r++) { let c = 0; while (c < COLS) { if (!inW(c, r) || ori(c, r) !== 'H') { c++; continue; } let c1 = c; while (inW(c1 + 1, r) && ori(c1 + 1, r) === 'H') c1++; roof(c * CELL, (c1 + 1) * CELL, r * CELL, (r + 1) * CELL, true); c = c1 + 1; } }
+    for (let c = 0; c < COLS; c++) { let r = 0; while (r < ROWS) { if (!inW(c, r) || ori(c, r) !== 'V') { r++; continue; } let r1 = r; while (inW(c, r1 + 1) && ori(c, r1 + 1) === 'V') r1++; roof(r * CELL, (r1 + 1) * CELL, c * CELL, (c + 1) * CELL, false); r = r1 + 1; } }
+    const seen = {};
+    const post = (x0, z0, x1, z1) => { const k = [x0, z0, x1, z1].map(v => v.toFixed(2)).join(); if (seen[k]) return; seen[k] = 1; gRed.box(x0, 1.15, z0, x1, 4.45, z1, 1); gStone.box(x0 - 0.05, 1.0, z0 - 0.05, x1 + 0.05, 1.32, z1 + 0.05); };
+    const open = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && MAP[r][c] !== '#';
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (!inW(c, r)) continue; const x0 = c * CELL, x1 = x0 + CELL, z0 = r * CELL, z1 = z0 + CELL;
+      if (open(c + 1, r)) [z0, z1].forEach(z => post(x1, z - 0.14, x1 + 0.13, z + 0.14));
+      if (open(c - 1, r)) [z0, z1].forEach(z => post(x0 - 0.13, z - 0.14, x0, z + 0.14));
+      if (open(c, r + 1)) [x0, x1].forEach(x => post(x - 0.14, z1, x + 0.14, z1 + 0.13));
+      if (open(c, r - 1)) [x0, x1].forEach(x => post(x - 0.14, z0 - 0.13, x + 0.14, z0));
     }
   }
   const PIT = { c: 15, r: 8 };
@@ -127,7 +164,7 @@
   // stepping stones to the island
   [[34.2, 42.9], [33.7, 41.0], [34.3, 39.1], [33.9, 37.3]].forEach(s => { gStone.box(s[0] - 0.6, -0.9, s[1] - 0.6, s[0] + 0.6, 0.03, s[1] + 0.6); col(s[0] - 0.6, -0.9, s[1] - 0.6, s[0] + 0.6, 0.03, s[1] + 0.6); });
   // climbing blocks (east wing)
-  const blocks = [[61, 25, 64, 28, 1.8], [60.5, 20.3, 64, 25, 3.6], [52.3, 20.3, 57.5, 23.5, 3.6]];
+  const blocks = [[61, 25, 64, 28, 1.8], [60.5, 20.3, 64, 25, 3.6], [52.3, 20.3, 57.5, 23.0, 3.6]];
   blocks.forEach(b => { gStone.box(b[0], 0, b[1], b[2], b[4] - 0.18, b[3]); gDark.box(b[0] - 0.08, b[4] - 0.18, b[1] - 0.08, b[2] + 0.08, b[4], b[3] + 0.08); col(b[0], 0, b[1], b[2], b[4], b[3]); });
   // great gate frame
   gRed.box(31.6, 4.2, 17.6, 36.4, 5.0, 18.4, 1); gRed.box(31.7, 0, 17.7, 32.0, 4.2, 18.3, 1); gRed.box(36.0, 0, 17.7, 36.3, 4.2, 18.3, 1);
@@ -196,7 +233,7 @@
   [[29.3, 21.3], [38.7, 21.3]].forEach(p => { place(prop(nature, 'guardianLion'), p[0], 0, p[1]); col(p[0] - 0.65, 0, p[1] - 0.65, p[0] + 0.65, 2.3, p[1] + 0.65); });
   const brazierAt = (x, z) => { const b = prop(arch, 'brazier'); place(b, x, 0, z); col(x - 0.4, 0, z - 0.4, x + 0.4, 1.1, z + 0.4); const fp = b.userData.firePos ? b.userData.firePos.clone() : new T.Vector3(0, 1.05, 0); fp.add(b.position); flames.push(fp); addLight(x, fp.y + 0.5, z, 0xff6a20, 26); moteList.push({ pos: fp, radius: 0.18, h: 1.2, n: 14, color: [3.0, 1.1, 0.2], size: 0.035, rise: 1 }); };
   brazierAt(31.0, 20.9); brazierAt(37.0, 20.9); brazierAt(25.2, 5.2); brazierAt(42.8, 5.2); brazierAt(25.2, 14.8); brazierAt(42.8, 14.8);
-  brazierAt(12.8, 31.0); brazierAt(38.8, 61.0); brazierAt(3.0, 69.0); brazierAt(65.0, 69.0);
+  brazierAt(12.8, 31.0); brazierAt(44.6, 63.2); brazierAt(4.9, 71.1); brazierAt(63.1, 71.1);
   // island pavilion
   { const g = new GB(); [[-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5]].forEach(o => { g.box(34 + o[0] - 0.16, 0.3, 34 + o[1] - 0.16, 34 + o[0] + 0.16, 3.5, 34 + o[1] + 0.16, 1); col(34 + o[0] - 0.16, 0.3, 34 + o[1] - 0.16, 34 + o[0] + 0.16, 3.5, 34 + o[1] + 0.16); });
     g.mesh(M.redLacquer); place(prop(arch, 'pavilionRoof', 3, 3, 2.0), 34, 3.5, 34); addLight(34, 2.9, 34, 0xffb060, 10); }
@@ -215,11 +252,38 @@
   });
   for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + 0.2, R = 50 + rnd() * 12; place(prop(nature, 'bambooCluster', 9, 2, 11 + rnd() * 4, i + 50), center.x + Math.cos(a) * R * 0.95, 0, center.z + Math.sin(a) * R * 1.05); }
   place(prop(arch, 'pagoda', 4, 9), 34, 0, -16); place(prop(arch, 'pagoda', 3, 6), -14, 0, 20, 0.5); place(prop(arch, 'pagoda', 3, 6), 82, 0, 30, 0.3);
-  place(prop(arch, 'bell'), 38.5, 0, 62, Math.PI / 2, 0.85); col(37.6, 0, 60.8, 39.6, 3, 63.2);
+  place(prop(arch, 'bell'), 41.6, 0, 62, Math.PI / 2, 0.85); col(40.7, 0, 60.8, 42.6, 3, 63.2);
   { const b = prop(arch, 'incenseBurner'); place(b, 13.9, 0, 21.2); col(13.4, 0, 20.7, 14.4, 1, 21.7); moteList.push({ pos: new T.Vector3(13.9, 1.0, 21.2), radius: 0.1, h: 1.6, n: 16, color: [0.35, 0.35, 0.4], size: 0.05, rise: 0.5 }); }
-  place(prop(arch, 'moonGate', 4, 4.4, 0.5, 1.55), 34, 0, 46.0);
+  place(prop(arch, 'moonGate', 4, 4.4, 0.5, 1.55), 34, 0, 48.0); col(32, 0, 47.75, 32.7, 4.4, 48.25); col(35.3, 0, 47.75, 36, 4.4, 48.25);
   // spikes in the pit
   place(prop(nature, 'spikes', 3.6, 2.4), 62, -3.6, 34);
+
+  // ---------- ground cover: grass tufts along wall bases, fallen petals ----------
+  {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d'); const rr = JL.rng(404);
+    for (let i = 0; i < 46; i++) { const x = 8 + rr() * 112, h = 40 + rr() * 80, lean = (rr() - 0.5) * 40; const gr = g.createLinearGradient(0, 128, 0, 128 - h); gr.addColorStop(0, 'rgb(' + (30 + rr() * 20 | 0) + ',' + (48 + rr() * 30 | 0) + ',14)'); gr.addColorStop(1, 'rgb(' + (90 + rr() * 60 | 0) + ',' + (120 + rr() * 50 | 0) + ',40)'); g.strokeStyle = gr; g.lineWidth = 1.5 + rr() * 2.5; g.lineCap = 'round'; g.beginPath(); g.moveTo(x, 128); g.quadraticCurveTo(x + lean * 0.2, 128 - h * 0.6, x + lean, 128 - h); g.stroke(); }
+    const tx = new T.CanvasTexture(cv); tx.encoding = T.sRGBEncoding;
+    const gb = new GB(); for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3, dx = Math.cos(a) * 0.28, dz = Math.sin(a) * 0.28; gb.quad([-dx, 0, -dz], [dx, 0, dz], [dx, 0.42, dz], [-dx, 0.42, -dz], [0, 1, 0], [0, 0, 1, 0, 1, 1, 0, 1]); }
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(gb.p, 3)); geo.setAttribute('normal', new T.Float32BufferAttribute(gb.n, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(gb.u, 2)); geo.setIndex(gb.i);
+    const mat = new T.MeshStandardMaterial({ map: tx, alphaTest: 0.35, side: T.DoubleSide, roughness: 0.95 });
+    const spots = [];
+    const open = (c, r) => c >= 0 && r >= 0 && c < COLS && r < ROWS && MAP[r][c] === '.';
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+      if (at(c, r) !== '#') continue; const x0 = c * CELL, z0 = r * CELL;
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(d => { if (!open(c + d[0], r + d[1]) || (c + d[0] === PIT.c && r + d[1] === PIT.r)) return; const n = 3 + (rr() * 6 | 0);
+        for (let i = 0; i < n; i++) { const t = rr() * CELL, o = 0.14 + rr() * rr() * 0.5; spots.push(d[0] ? [d[0] > 0 ? x0 + CELL + o : x0 - o, z0 + t] : [x0 + t, d[1] > 0 ? z0 + CELL + o : z0 - o]); } });
+    }
+    const im = new T.InstancedMesh(geo, mat, spots.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), cc = new T.Color();
+    spots.forEach((s, i) => { const sc = 0.6 + rr() * 1.1; e.set(0, rr() * 6.28, 0); q.setFromEuler(e); m4.compose(new T.Vector3(s[0], -0.01, s[1]), q, new T.Vector3(sc, sc * (0.7 + rr() * 0.7), sc)); im.setMatrixAt(i, m4); cc.setHSL(0.22 + rr() * 0.08, 0.5, 0.35 + rr() * 0.25); im.setColorAt(i, cc); });
+    im.receiveShadow = true; scene.add(im);
+    // fallen petals
+    const pg = new T.CircleGeometry(0.04, 5); pg.rotateX(-Math.PI / 2);
+    const pm = new T.MeshStandardMaterial({ color: 0xffc0d2, roughness: 0.8, side: T.DoubleSide });
+    const src = [[21.3, 21.3, 4.5, 260], [46.7, 46.7, 4.5, 240], [34, 58, 6, 420], [34, 68, 5, 160], [18, 62, 5, 120], [48, 56, 5, 120]]; let tot = 0; src.forEach(s => tot += s[3]);
+    const pim = new T.InstancedMesh(pg, pm, tot); let k = 0;
+    src.forEach(s => { for (let i = 0; i < s[3]; i++) { const a = rr() * 6.28, d = Math.sqrt(rr()) * s[2]; const sc = 0.6 + rr() * 0.9; e.set((rr() - 0.5) * 0.3, rr() * 6.28, (rr() - 0.5) * 0.3); q.setFromEuler(e); m4.compose(new T.Vector3(s[0] + Math.cos(a) * d, 0.012 + rr() * 0.01, s[1] + Math.sin(a) * d), q, new T.Vector3(sc, 1, sc * 1.5)); pim.setMatrixAt(k, m4); cc.setHSL(0.94 + rr() * 0.04, 0.8, 0.72 + rr() * 0.15); pim.setColorAt(k++, cc); } });
+    pim.receiveShadow = true; scene.add(pim);
+  }
 
   // ---------- water ----------
   let water = null;
@@ -304,10 +368,11 @@
     document.querySelectorAll('#seals i').forEach((e, i) => e.classList.toggle('on', i < sealsGot));
   }
 
-  function groundY(x, z, y) { let g = -100; for (const b of colliders) { if (b.off) continue; if (x > b.x0 - 0.15 && x < b.x1 + 0.15 && z > b.z0 - 0.15 && z < b.z1 + 0.15 && b.y1 <= y + 0.45 && b.y1 > g) g = b.y1; } return g; }
-  function collideXZ(p, r) {
+  function groundY(x, z, y, up) { if (up === undefined) up = 0.45; let g = -100; for (const b of colliders) { if (b.off) continue; if (x > b.x0 - 0.3 && x < b.x1 + 0.3 && z > b.z0 - 0.3 && z < b.z1 + 0.3 && b.y1 <= y + up && b.y1 > g) g = b.y1; } return g; }
+  function collideXZ(p, r, st) {
+    if (st === undefined) st = 0.45;
     for (let it = 0; it < 2; it++) for (const b of colliders) {
-      if (b.off || b.y1 <= p.y + 0.45 || b.y0 >= p.y + 1.6) continue;
+      if (b.off || b.y1 <= p.y + st || b.y0 >= p.y + 1.6) continue;
       const qx = clamp(p.x, b.x0, b.x1), qz = clamp(p.z, b.z0, b.z1), dx = p.x - qx, dz = p.z - qz, d2 = dx * dx + dz * dz;
       if (d2 >= r * r) continue;
       if (d2 > 1e-8) { const d = Math.sqrt(d2); p.x = qx + dx / d * r; p.z = qz + dz / d * r; }
@@ -322,7 +387,7 @@
     pl.climb = { fx: pl.pos.x, fy: pl.pos.y, fz: pl.pos.z, ty, tx: px, tz: pz }; pl.climbT = 0; pl.state = 'climb'; pl.vel.set(0, 0, 0); pl.grounded = false; return true;
   }
   function damage(n, kx, kz) {
-    if (pl.inv > 0 || mode !== 'play') return; pl.hp -= n; pl.inv = 1.0; hurt = 1; pl.vel.x = kx * 6; pl.vel.z = kz * 6; pl.vel.y = 3; pl.grounded = false; pl.climb = null;
+    if (pl.inv > 0 || mode !== 'play') return; pl.hp -= n; pl.hurtT = 0; pl.inv = 1.0; hurt = 1; pl.vel.x = kx * 6; pl.vel.z = kz * 6; pl.vel.y = 3; pl.grounded = false; pl.climb = null;
     if (pl.hp <= 0) die();
   }
   function die() { if (pl.dead > 0) return; pl.dead = 0.001; pl.state = 'dead'; pl.hp = 0; }
@@ -337,6 +402,7 @@
     }
     fade = Math.min(1, fade + dt * 1.5);
     pl.inv = Math.max(0, pl.inv - dt);
+    pl.hurtT = (pl.hurtT || 0) + dt; if (pl.hurtT > 5 && pl.hp < 100) pl.hp = Math.min(100, pl.hp + dt * 6);
     if (pl.climb) {
       const c = pl.climb; pl.climbT += dt / 0.8; const t = pl.climbT;
       const a = clamp(t / 0.6, 0, 1), b = clamp((t - 0.5) / 0.5, 0, 1), ea = a * a * (3 - 2 * a), eb = b * b * (3 - 2 * b);
@@ -355,18 +421,25 @@
     const acc = pl.grounded ? 14 : 4, k = 1 - Math.exp(-acc * dt);
     pl.vel.x = lerp(pl.vel.x, tx, k); pl.vel.z = lerp(pl.vel.z, tz, k);
     if (il > 0.1) { const want = Math.atan2(tx, tz); let d = want - pl.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); pl.yaw += d * (1 - Math.exp(-12 * dt)); }
-    if (jumpQ) { jumpQ = false; if (pl.grounded) { if (!(il > 0.1 && tryMantle())) { pl.vel.y = 6.7; pl.grounded = false; } } }
+    // jump buffering + coyote time; wading auto-climbs out of the pool
+    if (jumpQ) { jumpQ = false; pl.jbuf = 0.13; }
+    pl.jbuf = (pl.jbuf || 0) - dt; pl.coy = pl.grounded ? 0.1 : (pl.coy || 0) - dt;
+    if (pl.jbuf > 0) { if (il > 0.1 && tryMantle()) pl.jbuf = 0; else if (pl.coy > 0) { pl.vel.y = 6.7; pl.grounded = false; pl.jumped = true; pl.coy = 0; pl.jbuf = 0; } }
+    else if (pl.grounded && wade && il > 0.1) tryMantle();
     if (pl.climb) return;
     const prevY = pl.pos.y;
     pl.pos.x += pl.vel.x * dt; pl.pos.z += pl.vel.z * dt;
-    collideXZ(pl.pos, 0.34);
+    // airborne: no step-up (prevents hopping onto 5 m wall tops from high ledges)
+    const stepUp = (pl.grounded || (!pl.jumped && pl.coy > -0.15)) ? 0.45 : 0.08;
+    collideXZ(pl.pos, 0.34, stepUp);
     if (pl.grounded) {
+      pl.jumped = false;
       const g = groundY(pl.pos.x, pl.pos.z, pl.pos.y);
       if (g < pl.pos.y - 0.5) { pl.grounded = false; pl.vel.y = 0; } else pl.pos.y = lerp(pl.pos.y, g, 1 - Math.exp(-25 * dt));
     } else {
       pl.vel.y -= 20 * dt; pl.pos.y += pl.vel.y * dt;
-      if (pl.vel.y <= 0) { const g = groundY(pl.pos.x, pl.pos.z, prevY); if (pl.pos.y <= g) { pl.pos.y = g; pl.vel.y = 0; pl.grounded = true; } }
-      if (!pl.grounded && il > 0.1 && pl.vel.y < 4) tryMantle();
+      if (pl.vel.y <= 0) { const g = groundY(pl.pos.x, pl.pos.z, prevY, Math.max(0.12, stepUp)); if (pl.pos.y <= g) { pl.pos.y = g; pl.vel.y = 0; pl.grounded = true; } }
+      if (!pl.grounded && pl.jumped && il > 0.1 && pl.vel.y < 4) tryMantle();
     }
     const sp = Math.hypot(pl.vel.x, pl.vel.z);
     pl.state = pl.climb ? 'climb' : !pl.grounded ? (pl.vel.y > 0 ? 'jump' : 'fall') : sp > 0.4 ? 'run' : 'idle';
@@ -388,7 +461,7 @@
     seals.forEach((s, i) => {
       if (s.got) return;
       s.g.rotation.y += dt * 1.2; s.g.position.y = s.base + Math.sin(time * 1.7 + i) * 0.08;
-      if (!(s.locked && !cageOpen) && Math.hypot(px - s.g.position.x, pz - s.g.position.z) < 1.1 && Math.abs(py + 0.9 - s.g.position.y) < 1.4 && mode === 'play') {
+      if (!(s.locked && !cageOpen) && Math.hypot(px - s.g.position.x, pz - s.g.position.z) < 1.7 && Math.abs(py + 0.9 - s.g.position.y) < 1.4 && mode === 'play') {
         s.got = true; s.g.visible = false; sealsGot++; setObjective();
         say(sealsGot < 3 ? 'Jade seal recovered  ·  ' + sealsGot + ' of 3' : 'All three seals are yours. The Vermilion Gate awaits.', 4.5);
       }
@@ -414,7 +487,7 @@
       if (Math.abs(pz - b.z) < 0.5 && Math.abs(px - tx) < 0.75 && py < ty + 0.8 && py + 1.7 > ty - 0.7) damage(35, Math.sign(Math.cos(time * 2.4 + b.ph)) * 0.6, pz > b.z ? 0.8 : -0.8);
     });
     spikeTraps.forEach(s => {
-      const c = (time + s.ph) % 3.0; const tgt = c < 1.3 ? 1 : 0; s.up = lerp(s.up, tgt, 1 - Math.exp(-(tgt ? 22 : 5) * dt)); s.g.position.y = -1.0 + s.up * 1.0;
+      const c = (time + s.ph) % 3.0; const tgt = c < 1.0 ? 1 : 0; s.up = lerp(s.up, tgt, 1 - Math.exp(-(tgt ? 22 : 5) * dt)); s.g.position.y = -1.0 + s.up * 1.0;
       if (s.up > 0.6 && Math.abs(px - s.x) < 1.1 && Math.abs(pz - s.z) < 1.9 && py < 0.7) damage(35, px > s.x ? 0.8 : -0.8, 0);
     });
     actQ = false;
@@ -497,7 +570,8 @@
   const hs = { state: 'idle', speed: 0, vy: 0, climbT: 0, t: 0 };
   function frame(now) {
     window.__frames = (window.__frames || 0) + 1;
-    requestAnimationFrame(frame);
+    if (window.JL_NORENDER) return;
+    if (!window.JL_MANUAL) requestAnimationFrame(frame);
     const rdt = (now - last) / 1000; last = now; const dt = Math.min(0.05, rdt); time += dt;
     updatePlayer(dt); updateEntities(dt);
     heroine.group.position.copy(pl.pos); heroine.group.rotation.y = pl.yaw;
@@ -518,6 +592,23 @@
     // adaptive resolution
     if (!window.JL_FIXED_SCALE) { fAcc += rdt; fN++; if (fAcc > 1.5) { const fps = fN / fAcc; fAcc = 0; fN = 0; if (fps < 33 && scale > 0.5) { scale = Math.max(0.5, scale * 0.85); resize(); } else if (fps > 56 && scale < maxScale) { scale = Math.min(maxScale, scale * 1.08); resize(); } } }
   }
-  JL.debug = { pl, colliders, get mode() { return mode; }, set cam(v) { camYaw = v[0]; camPitch = v[1]; }, tp(x, y, z) { pl.pos.set(x, y, z); pl.vel.set(0, 0, 0); camTarget.set(x, y + 1.45, z); }, give() { sealsGot = 3; setObjective(); }, renderer };
+  JL.debug = { pl, colliders, get mode() { return mode; }, set cam(v) { camYaw = v[0]; camPitch = v[1]; }, tp(x, y, z) { pl.pos.set(x, y, z); pl.vel.set(0, 0, 0); pl.climb = null; pl.grounded = true; pl.state = 'idle'; camTarget.set(x, y + 1.45, z); }, give() { sealsGot = 3; setObjective(); }, renderer };
+  JL.debug.sim = function (sec, inp) {
+    inp = inp || {}; const n = Math.round(sec * 60); let i = 0;
+    for (; i < n; i++) {
+      if (inp.camYaw !== undefined) camYaw = inp.camYaw;
+      if (inp.to) camYaw = Math.atan2(inp.to[0] - pl.pos.x, inp.to[1] - pl.pos.z);
+      keys.KeyW = (inp.fwd || 0) > 0 || !!inp.to; keys.KeyS = (inp.fwd || 0) < 0; keys.KeyD = (inp.right || 0) > 0; keys.KeyA = (inp.right || 0) < 0;
+      if (i === 0 && inp.jump) jumpQ = true; if (i === 0 && inp.act) actQ = true;
+      if (inp.jumpAt !== undefined && i === Math.round(inp.jumpAt * 60)) jumpQ = true;
+      if (inp.jumpIf && inp.jumpIf(pl)) jumpQ = true;
+      time += 1 / 60; updatePlayer(1 / 60); updateEntities(1 / 60);
+      if (inp.to && Math.hypot(inp.to[0] - pl.pos.x, inp.to[1] - pl.pos.z) < (inp.tol || 0.35)) break;
+      if (inp.until && inp.until(pl)) break;
+    }
+    keys.KeyW = keys.KeyS = keys.KeyA = keys.KeyD = false;
+    return { x: +pl.pos.x.toFixed(2), y: +pl.pos.y.toFixed(2), z: +pl.pos.z.toFixed(2), g: pl.grounded, st: pl.state, hp: Math.round(pl.hp), dead: pl.dead > 0, seals: sealsGot, gate: gateOpen, cage: cageOpen, mode, t: +time.toFixed(2), steps: i, prompt };
+  };
+  JL.debug.snap = function (n) { let t = performance.now(); for (let i = 0; i < (n || 2); i++) { t += 50; frame(t); } return canvas.toDataURL("image/jpeg", 0.9); };
   requestAnimationFrame(frame);
 })(window.JL);

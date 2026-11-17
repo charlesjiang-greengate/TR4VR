@@ -444,4 +444,78 @@ window.JL = {};
     });
     const pts = new T.Points(g, m); pts.frustumCulled = false; return pts;
   };
+
+  // ---------- real photo-scanned assets (Poly Haven, CC0); procedural stays as fallback ----------
+  JL.loadRealAssets = function (renderer, scene, M, sky, sunDir) {
+    const base = 'assets/tex/', TL = new T.TextureLoader();
+    const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const load = (file, srgb, rep) => new Promise(res => TL.load(base + file, t => {
+      t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = aniso; if (srgb) t.encoding = T.sRGBEncoding; t.repeat.set(rep, rep); res(t);
+    }, undefined, () => res(null)));
+    // name, repeat (UV units per texture tile), rough?, then per-material setup
+    const set = (name, rep, rough, fn) => Promise.all([load(name + '_d.jpg', true, rep), load(name + '_n.jpg', false, rep), rough ? load(name + '_r.jpg', false, rep) : null])
+      .then(r => { if (r[0] && r[1]) { try { fn(r[0], r[1], r[2]); } catch (e) { console.warn('tex', name, e); } } });
+    const put = (m, d, n, r, color, ns, rough) => {
+      if (!m) return;
+      if (d) m.map = d; m.normalMap = n; if (r) m.roughnessMap = r;
+      if (color !== undefined) m.color.setHex(color);
+      m.normalScale.set(ns, ns); if (rough !== undefined) m.roughness = rough; m.needsUpdate = true;
+    };
+    set('plaster', 0.5, true, (d, n, r) => put(M.plaster, d, n, r, 0xd9988a, 1.3, 1.0));
+    set('stone', 1.0, true, (d, n, r) => { put(M.stone, d, n, r, 0xb9b4aa, 1.4, 1.0); put(M.darkStone, d, n, r, 0x6f7377, 1.4, 1.0); put(M.poolFloor, d, n, r, 0x4f6e62, 1.2, 0.9); });
+    set('floor', 2 / 3, true, (d, n, r) => put(M.floor, d, n, r, 0xa7a39b, 1.6, 0.9));
+    set('roof', 1 / 3, true, (d, n, r) => { put(M.roofTile, d, n, r, 0x8d949c, 1.5, 0.85); M.roofTile.metalness = 0; });
+    set('wood', 0.55, true, (d, n, r) => { put(M.wood, d, n, r, 0x8a7360, 1.2, 1.0); put(M.redLacquer, null, n, r, undefined, 0.5, 0.5); });
+    set('bark', 1.0, false, (d, n) => put(M.bark, d, n, null, 0x9a8c7c, 1.3, 0.95));
+    load('ground_d.jpg', true, 420).then(t => {
+      if (!t) return;
+      scene.traverse(o => { if (o.isMesh && o.geometry && o.geometry.type === 'CircleGeometry' && o.geometry.parameters.radius > 300) { o.material.map = t; o.material.color.setHex(0x59684a); o.material.needsUpdate = true; } });
+    });
+
+    // ---- HDRI sky (kloofendal_48d_partly_cloudy_puresky): JPG for the visible dome, .hdr for image-based lighting ----
+    const SUN_U = 0.5947; // sun column in the equirect
+    const uOff = SUN_U - (Math.atan2(sunDir.z, sunDir.x) / (2 * Math.PI) + 0.5);
+    const SKY_VS = 'varying vec3 vD; void main(){ vD=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }';
+    const SKY_FS = `
+      varying vec3 vD; uniform sampler2D tSky; uniform vec3 sunDir; uniform float uOff, time, uHalf, uGain, uClamp, uSun;
+      void main(){
+        vec3 d=normalize(vD);
+        float u=atan(d.z,d.x)*0.15915494+0.5+uOff;
+        float el=asin(clamp(d.y,-1.,1.));
+        float v=uHalf>0.5 ? clamp(el*0.63661977,0.004,0.996) : clamp(el*0.31830989+0.5,0.004,0.996);
+        vec3 c=texture2D(tSky,vec2(u,v)).rgb;
+        if(uHalf>0.5){ float l=dot(c,vec3(0.2126,0.7152,0.0722)); c*=1.+0.7*smoothstep(0.55,1.,l); }
+        c=min(c*uGain,vec3(uClamp));
+        float y=max(d.y,0.);
+        c*=mix(vec3(1.22,0.93,0.70),vec3(1.02,0.98,0.93),smoothstep(0.,0.55,y));
+        float s=max(dot(d,sunDir),0.);
+        c+=vec3(1.0,0.55,0.25)*pow(s,6.)*0.30;
+        c+=uSun*vec3(1.0,0.8,0.55)*(pow(s,900.)*40.+pow(s,60.)*0.9);
+        if(d.y<0.) c=mix(c,vec3(0.10,0.12,0.12),smoothstep(0.,-0.12,d.y));
+        gl_FragColor=vec4(c,1.);
+      }`;
+    const skyMat = (tex, half, gain, clampV, sunAmt) => new T.ShaderMaterial({
+      side: T.BackSide, depthWrite: false, vertexShader: SKY_VS, fragmentShader: SKY_FS,
+      uniforms: { tSky: { value: tex }, sunDir: { value: sunDir.clone() }, uOff: { value: uOff }, time: { value: 0 }, uHalf: { value: half ? 1 : 0 }, uGain: { value: gain }, uClamp: { value: clampV }, uSun: { value: sunAmt } }
+    });
+    const bakeEnv = mat => {
+      const pm = new T.PMREMGenerator(renderer), es = new T.Scene();
+      es.add(new T.Mesh(new T.SphereGeometry(50, 32, 16), mat));
+      const old = scene.environment; scene.environment = pm.fromScene(es, 0.02).texture; pm.dispose();
+      if (old && old.dispose) old.dispose();
+    };
+    let hdrDone = false;
+    TL.load(base + 'sky.jpg', t => {
+      t.encoding = T.sRGBEncoding; t.wrapS = T.RepeatWrapping; t.wrapT = T.ClampToEdgeWrapping;
+      t.minFilter = T.LinearFilter; t.magFilter = T.LinearFilter; t.generateMipmaps = false;
+      const old = sky.material; sky.material = skyMat(t, true, 0.95, 4.0, 1.0); if (old && old.dispose) old.dispose();
+      if (!hdrDone) { try { bakeEnv(skyMat(t, true, 0.9, 4.0, 0.25)); } catch (e) { console.warn('env jpg', e); } }
+    }, undefined, () => { });
+    if (T.RGBELoader) {
+      new T.RGBELoader().load(base + 'sky_1k.hdr', t => {
+        t.wrapS = T.RepeatWrapping; t.wrapT = T.ClampToEdgeWrapping; t.minFilter = T.LinearFilter; t.magFilter = T.LinearFilter; t.generateMipmaps = false;
+        try { bakeEnv(skyMat(t, false, 0.85, 6.0, 0.0)); hdrDone = true; } catch (e) { console.warn('env hdr', e); }
+      }, undefined, () => { });
+    }
+  };
 })(window.JL);

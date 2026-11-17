@@ -1,8 +1,9 @@
-/* Procedural heroine — original character, built from primitives. three.js r147 (global THREE).
-   window.createHeroine(THREE) -> { group, update(dt, s), height } ; origin at feet, facing +Z. */
+/* Heroine: skinned GLB character (assets/char/heroine.glb + anims.glb) with two variants (setVariant 'elder'|'younger');
+   the procedural figure below is the instant stand-in / fallback. three.js r147 (global THREE).
+   window.createHeroine(THREE) -> { group, update(dt, s), height, setVariant(name) } ; origin at feet, facing +Z. */
 (function () {
   'use strict';
-  window.createHeroine = function (THREE) {
+  function createProceduralHeroine(THREE) {
     const group = new THREE.Group();
     group.name = 'heroine';
     const PI = Math.PI;
@@ -370,6 +371,230 @@
     }
 
     update(0.016, { state: 'idle', speed: 0, vy: 0, climbT: 0, t: 0 });
-    return { group: group, update: update, height: 1.68 };
+    return { group: group, update: update, height: 1.68, mats: M };
+  }
+
+  /* ===== Skinned, textured heroine (GLB) with two selectable variants ===== */
+  var VARS = { elder: { h: 1.62, head: 1.0 }, younger: { h: 1.42, head: 1.13 } };
+  var PH_COL = { elder: { top: 0xe9e9e4, bottom: 0x7da6d0 }, younger: { top: 0xf2bcc8, bottom: 0xb0b2b8 } };
+  var CHILD = { Spine: 'Spine1', LeftArm: 'LeftForeArm', LeftForeArm: 'LeftHand', RightArm: 'RightForeArm', RightForeArm: 'RightHand', LeftUpLeg: 'LeftLeg', LeftLeg: 'LeftFoot', RightUpLeg: 'RightLeg', RightLeg: 'RightFoot' };
+  var ORDER = ['Spine', 'LeftArm', 'LeftForeArm', 'RightArm', 'RightForeArm', 'LeftUpLeg', 'LeftLeg', 'RightUpLeg', 'RightLeg'];
+  // pose directions in character space (x = her left, y = up, z = forward)
+  function mirror(p) { var o = { Spine: p.Spine }; ['Arm', 'ForeArm', 'UpLeg', 'Leg'].forEach(function (k) { if (p['L' + k]) o['Left' + k] = p['L' + k]; var r = p['R' + k] || p['L' + k]; if (r) o['Right' + k] = p['R' + k] ? r : [-r[0], r[1], r[2]]; }); return o; }
+  var POSES = {
+    jump: mirror({ Spine: [0, 1, 0.12], LArm: [0.35, 0.55, 0.65], LForeArm: [0.1, 0.9, 0.4], LUpLeg: [0.1, -0.55, 0.8], LLeg: [0.05, -0.9, -0.4], RUpLeg: [-0.1, -0.97, -0.15], RLeg: [-0.05, -0.8, -0.6] }),
+    fall: mirror({ Spine: [0, 1, 0.05], LArm: [0.8, 0.4, 0.2], LForeArm: [0.55, 0.75, 0.3], LUpLeg: [0.16, -0.9, 0.35], LLeg: [0.1, -0.95, -0.3], RUpLeg: [-0.14, -0.97, 0.05], RLeg: [-0.1, -0.85, -0.5] }),
+    hang: mirror({ Spine: [0, 1, 0.02], LArm: [0.2, 0.93, 0.28], LForeArm: [0.02, 0.96, 0.25], LUpLeg: [0.08, -0.97, 0.15], LLeg: [0.05, -0.95, -0.3] }),
+    pull: mirror({ Spine: [0, 0.9, 0.42], LArm: [0.4, -0.5, 0.35], LForeArm: [0.1, -0.6, 0.8], LUpLeg: [0.15, 0.05, 0.98], LLeg: [0.05, -0.92, -0.35], RUpLeg: [-0.1, -0.9, -0.35], RLeg: [-0.05, -0.6, -0.8] }),
+    dead: mirror({ Spine: [0, 1, 0], LArm: [0.75, 0.6, 0.1], LForeArm: [0.3, 0.9, 0.1], LUpLeg: [0.18, -0.98, 0], LLeg: [0.25, -0.95, -0.1] })
+  };
+
+  window.createHeroine = function (THREE) {
+    var group = new THREE.Group(); group.name = 'heroine';
+    var ph = null;
+    try { ph = createProceduralHeroine(THREE); group.add(ph.group); } catch (e) { console.warn('placeholder heroine', e); }
+    var pivot = new THREE.Group(); group.add(pivot);
+    var variant = 'elder', model = null, mixer = null, acts = {}, bones = {}, restQ = {}, restDir = {}, mat = null, mesh = null, baseMap = null, baked = null, texByVar = {}, modelH = 1.66;
+    var w = { i: 1, w: 0, r: 0 }, pw = { jump: 0, fall: 0, climb: 0, dead: 0 }, prevYaw = null, lean = 0, deadK = 0;
+    var Q = function () { return new THREE.Quaternion(); }, V3 = function () { return new THREE.Vector3(); };
+    var q1 = Q(), q2 = Q(), q3 = Q(), qd = Q(), v1 = V3(), v2 = V3(), vd = V3();
+    var api = { group: group, update: update, height: 1.62, setVariant: setVariant, ready: false };
+    function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+    function sm(a, b, x) { var t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); }
+
+    function setVariant(name) { if (VARS[name]) variant = name; applyVariant(); return api; }
+    function applyVariant() {
+      var v = VARS[variant]; api.height = v.h;
+      if (ph) {
+        ph.group.scale.setScalar(v.h / 1.68);
+        try { var m = ph.mats, c = PH_COL[variant]; if (m) { m.teal.color.setHex(c.top); m.tealD.color.setHex(c.top); m.trouser.color.setHex(c.bottom); m.hair.color.setHex(0x0a090a); } } catch (e) { }
+      }
+      if (!model) return;
+      model.scale.setScalar(v.h / modelH);
+      if (bones.Head) bones.Head.scale.setScalar(v.head);
+      try { if (!texByVar[variant]) texByVar[variant] = paint(variant); mat.map = texByVar[variant]; mat.needsUpdate = true; } catch (e) { console.warn('heroine paint', e); }
+    }
+
+    // ---------- UV-space bake of bind-pose positions, so clothes can be painted by body location ----------
+    function bake(geo, S) {
+      var P = geo.attributes.position, U = geo.attributes.uv, N = geo.attributes.normal, I = geo.index ? geo.index.array : null, n = I ? I.length : P.count;
+      var X = new Float32Array(S * S), Y = new Float32Array(S * S), Z = new Float32Array(S * S), NZ = new Float32Array(S * S), C = new Uint8Array(S * S), e = 0.12;
+      for (var t = 0; t < n; t += 3) {
+        var a = I ? I[t] : t, b = I ? I[t + 1] : t + 1, c = I ? I[t + 2] : t + 2;
+        var u0 = U.getX(a), v0 = U.getY(a), u1 = U.getX(b), v1_ = U.getY(b), u2 = U.getX(c), v2_ = U.getY(c);
+        var fu = Math.floor((u0 + u1 + u2) / 3), fv = Math.floor((v0 + v1_ + v2_) / 3);
+        u0 = (u0 - fu) * S; u1 = (u1 - fu) * S; u2 = (u2 - fu) * S; v0 = (v0 - fv) * S; v1_ = (v1_ - fv) * S; v2_ = (v2_ - fv) * S;
+        var area = (u1 - u0) * (v2_ - v0) - (u2 - u0) * (v1_ - v0); if (Math.abs(area) < 1e-9) continue; var inv = 1 / area;
+        var x0 = Math.max(0, Math.floor(Math.min(u0, u1, u2) - 1)), x1 = Math.min(S - 1, Math.ceil(Math.max(u0, u1, u2) + 1));
+        var y0 = Math.max(0, Math.floor(Math.min(v0, v1_, v2_) - 1)), y1 = Math.min(S - 1, Math.ceil(Math.max(v0, v1_, v2_) + 1));
+        for (var py = y0; py <= y1; py++) for (var px = x0; px <= x1; px++) {
+          var cx = px + 0.5, cy = py + 0.5;
+          var w0 = ((u1 - cx) * (v2_ - cy) - (u2 - cx) * (v1_ - cy)) * inv, w1 = ((u2 - cx) * (v0 - cy) - (u0 - cx) * (v2_ - cy)) * inv, w2 = 1 - w0 - w1;
+          if (w0 < -e || w1 < -e || w2 < -e) continue;
+          var inside = (w0 >= 0 && w1 >= 0 && w2 >= 0) ? 2 : 1, k = py * S + px;
+          if (C[k] > inside || (C[k] === 2 && inside === 2 && false)) continue;
+          if (C[k] === 2 && inside === 1) continue;
+          C[k] = inside;
+          X[k] = P.getX(a) * w0 + P.getX(b) * w1 + P.getX(c) * w2; Y[k] = P.getY(a) * w0 + P.getY(b) * w1 + P.getY(c) * w2; Z[k] = P.getZ(a) * w0 + P.getZ(b) * w1 + P.getZ(c) * w2;
+          NZ[k] = N ? N.getZ(a) * w0 + N.getZ(b) * w1 + N.getZ(c) * w2 : 1;
+        }
+      }
+      return { X: X, Y: Y, Z: Z, NZ: NZ, C: C, S: S };
+    }
+    function paint(vn) {
+      var S = 1024; if (!baked) baked = bake(mesh.geometry, S);
+      var cv = document.createElement('canvas'); cv.width = cv.height = S; var cx = cv.getContext('2d');
+      cx.drawImage(baseMap.image, 0, 0, S, S); var id = cx.getImageData(0, 0, S, S), d = id.data;
+      var tc = document.createElement('canvas'); tc.width = 128; tc.height = 96; var tx = tc.getContext('2d');
+      tx.fillStyle = '#000'; tx.fillRect(0, 0, 128, 96); tx.fillStyle = '#fff'; tx.font = '900 92px Impact, "Arial Black", "Helvetica Neue", Arial, sans-serif'; tx.textAlign = 'center'; tx.textBaseline = 'middle'; tx.fillText('98', 64, 52);
+      var td = tx.getImageData(0, 0, 128, 96).data;
+      var elder = vn === 'elder', X = baked.X, Y = baked.Y, NZ = baked.NZ, C = baked.C;
+      for (var k = 0; k < S * S; k++) {
+        var o = k * 4, r = d[o], g = d[o + 1], b = d[o + 2];
+        var mx = Math.max(r, g, b), mn = Math.min(r, g, b), val = mx / 255, sat = mx ? (mx - mn) / mx : 0, hue = 0;
+        if (mx !== mn) { if (mx === r) hue = 60 * (((g - b) / (mx - mn)) % 6); else if (mx === g) hue = 60 * ((b - r) / (mx - mn) + 2); else hue = 60 * ((r - g) / (mx - mn) + 4); if (hue < 0) hue += 360; }
+        var lum = (0.3 * r + 0.59 * g + 0.11 * b) / 255;
+        var isSkin = hue >= 6 && hue <= 42 && sat > 0.22 && sat < 0.85 && val > 0.2 && val < 0.9;
+        var isYellow = hue > 42 && hue < 66 && sat > 0.4 && val > 0.45;
+        var ref = isSkin ? 0.36 : isYellow ? 0.80 : lum > 0.8 ? 0.92 : lum > 0.2 ? 0.55 : lum;
+        var sh = ref > 0 ? Math.min(1.1, Math.max(0.74, lum / ref)) : 1;
+        var R = r, G = g, B = b, set = false;
+        var skinOut = function (f) { var s = Math.min(1.08, Math.pow(Math.max(lum, 0.02) / 0.36, 0.5)) * (f || 1); R = 236 * s; G = 196 * s; B = 168 * s; set = true; };
+        if (isSkin) skinOut();
+        if (C[k]) {
+          var x = X[k], y = Y[k], ax = Math.abs(x), front = NZ[k] > 0.1;
+          var col = null, nz = ((k * 2654435761) >>> 24) / 255 - 0.5;
+          if (elder) {
+            var torso = ax < 0.215 && y > 0.86 && y <= 1.405, sleeve = ax >= 0.215 && ax < 0.37 && y > 1.15;
+            if (torso || sleeve) {
+              var yV = front ? 1.385 - Math.max(0, 0.075 - ax) * 1.25 : 1.39;
+              if (ax < 0.13 && y > yV) { if (!isSkin) { lum = 0.36; skinOut(0.97); } }
+              else if (ax < 0.14 && y > yV - 0.024) col = [150, 22, 34];
+              else if (sleeve && (ax > 0.352 || (ax > 0.316 && ax < 0.334))) col = [196, 26, 38];
+              else {
+                col = [242, 242, 238];
+                if (front && ax < 0.095 && y > 1.10 && y < 1.26) { var tu = Math.floor((x + 0.095) / 0.19 * 127), tv = Math.floor((1.26 - y) / 0.16 * 95); if (td[(tv * 128 + tu) * 4] > 128) col = [196, 26, 38]; }
+                if (y < 0.875) col = [214, 214, 212];
+              }
+            } else if (ax < 0.32 && y <= 0.86) {
+              if (y > 0.63) { col = y < 0.648 ? [206, 222, 238] : [124 + nz * 14, 166 + nz * 14, 212 + nz * 12]; }
+              else if (y > 0.31) { lum = 0.36 * (0.93 + sh * 0.07); skinOut(); }
+              else if (y > 0.27) col = [236, 236, 232];
+              else col = y < 0.03 ? [34, 28, 24] : [104, 66, 40];
+            }
+          } else {
+            var hood = (ax < 0.215 && y > 0.84 && y <= 1.415) || (ax >= 0.215 && ax < 0.645 && y > 1.12);
+            if (hood) {
+              col = [246, 198, 208];
+              if (y < 0.87 || ax > 0.615) col = [232, 178, 190];
+              if (front && ax < 0.215) {
+                if ((Math.abs(y - 1.05) < 0.006 && ax < 0.125) || (Math.abs(ax - 0.125 + (1.05 - y) * 0.25) < 0.006 && y > 0.93 && y < 1.05)) col = [222, 166, 180];
+                if (Math.abs(ax - 0.035) < 0.006 && y > 1.2 && y < 1.37) col = [250, 244, 244];
+              }
+            } else if (ax < 0.32 && y <= 0.84) {
+              if (y > 0.15) { var gcol = 178 + nz * 22; col = y < 0.19 ? [150, 152, 158] : [gcol, gcol + 2, gcol + 7]; }
+              else col = y < 0.028 ? [196, 196, 194] : [240, 240, 236];
+            }
+          }
+          if (col) { R = col[0] * sh; G = col[1] * sh; B = col[2] * sh; set = true; }
+          // hair stays black: desaturate any brownish dark hair on the head
+          if (!set && y > 1.40 && ax < 0.3 && lum < 0.22) { R = G = B = lum * 150; set = true; }
+        }
+        if (set) { d[o] = Math.min(255, R); d[o + 1] = Math.min(255, G); d[o + 2] = Math.min(255, B); }
+      }
+      cx.putImageData(id, 0, 0);
+      var t = new THREE.CanvasTexture(cv); t.flipY = false; t.encoding = THREE.sRGBEncoding; t.wrapS = baseMap.wrapS; t.wrapT = baseMap.wrapT; t.anisotropy = 4;
+      return t;
+    }
+
+    function setup(g, a) {
+      var root = g.scene;
+      root.traverse(function (o) {
+        if (o.isSkinnedMesh) { mesh = o; o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false; }
+        if (o.isBone) bones[o.name.replace('mixamorig', '')] = o;
+      });
+      var old = mesh.material; baseMap = old.map;
+      mat = new THREE.MeshStandardMaterial({ map: old.map, normalMap: old.normalMap, roughness: 0.66, metalness: 0, envMapIntensity: 0.85, side: THREE.DoubleSide, shadowSide: THREE.FrontSide });
+      if (old.normalScale) mat.normalScale.copy(old.normalScale).multiplyScalar(0.8);
+      mesh.material = mat;
+      mesh.geometry.computeBoundingBox(); modelH = mesh.geometry.boundingBox.max.y - Math.min(0, mesh.geometry.boundingBox.min.y); if (!(modelH > 0.5 && modelH < 3)) modelH = 1.66;
+      root.updateMatrixWorld(true);
+      ORDER.forEach(function (n) { var b = bones[n], c = bones[CHILD[n]]; if (!b || !c) return; restQ[n] = b.getWorldQuaternion(Q()); restDir[n] = c.getWorldPosition(V3()).sub(b.getWorldPosition(V3())).normalize(); });
+      // retarget clips from the animation rig (same Mixamo skeleton) by bone name
+      var sroot = a.scene; sroot.updateMatrixWorld(true);
+      var sH = null; sroot.traverse(function (o) { if (o.isBone && /Hips$/.test(o.name)) sH = sH || o; });
+      var tH = bones.Hips, Cq = tH.parent.getWorldQuaternion(Q()).invert().multiply(sH.parent.getWorldQuaternion(Q()));
+      var Ms = sH.parent.matrixWorld.clone(), MtInv = tH.parent.matrixWorld.clone().invert();
+      var ratio = tH.getWorldPosition(V3()).y / sH.getWorldPosition(V3()).y;
+      function retarget(clip) {
+        var tracks = [];
+        clip.tracks.forEach(function (t) {
+          var dot = t.name.lastIndexOf('.'), key = t.name.slice(0, dot).replace('mixamorig', ''), prop = t.name.slice(dot + 1), b = bones[key], i, vals;
+          if (!b) return;
+          if (prop === 'quaternion') {
+            vals = Float32Array.from(t.values);
+            if (key === 'Hips') for (i = 0; i < vals.length; i += 4) { q1.fromArray(vals, i).premultiply(Cq).toArray(vals, i); }
+            tracks.push(new THREE.QuaternionKeyframeTrack(b.name + '.quaternion', t.times, vals));
+          } else if (prop === 'position' && key === 'Hips') {
+            vals = Float32Array.from(t.values);
+            for (i = 0; i < vals.length; i += 3) { v1.fromArray(vals, i).applyMatrix4(Ms); v1.x *= ratio * 0.6; v1.y *= ratio; v1.z = 0; v1.applyMatrix4(MtInv).toArray(vals, i); }
+            tracks.push(new THREE.VectorKeyframeTrack(b.name + '.position', t.times, vals));
+          }
+        });
+        return new THREE.AnimationClip(clip.name, clip.duration, tracks);
+      }
+      mixer = new THREE.AnimationMixer(root);
+      var find = function (n) { return a.animations.filter(function (c) { return c.name.toLowerCase() === n; })[0]; };
+      ['idle', 'walk', 'run'].forEach(function (n) { var c = find(n); if (!c) throw new Error('missing clip ' + n); acts[n] = mixer.clipAction(retarget(c)); acts[n].play(); acts[n].setEffectiveWeight(n === 'idle' ? 1 : 0); });
+      pivot.add(root); model = root; if (ph) ph.group.visible = false;
+      applyVariant(); api.ready = true;
+    }
+    function fail(e) { console.warn('heroine model unavailable, using procedural stand-in', e && (e.message || e.type || e)); }
+    try {
+      if (THREE.GLTFLoader) {
+        var loader = new THREE.GLTFLoader();
+        loader.load('assets/char/heroine.glb', function (g) { loader.load('assets/char/anims.glb', function (a) { try { setup(g, a); } catch (e) { fail(e); } }, undefined, fail); }, undefined, fail);
+      }
+    } catch (e) { fail(e); }
+
+    var dirs = {};
+    function update(dt, s) {
+      if (!model) { if (ph) ph.update(dt, s); return; }
+      var st = s.state, sp = s.speed || 0, k = 1 - Math.exp(-10 * dt), kp = 1 - Math.exp(-13 * dt);
+      var ground = st === 'idle' || st === 'run';
+      var loco = ground ? sm(0.2, 1.0, sp) : 0, rm = sm(2.3, 4.0, sp);
+      w.i += ((1 - loco) - w.i) * k; w.w += (loco * (1 - rm) - w.w) * k; w.r += (loco * rm - w.r) * k;
+      acts.idle.setEffectiveWeight(w.i); acts.walk.setEffectiveWeight(w.w); acts.run.setEffectiveWeight(w.r);
+      acts.walk.timeScale = Math.min(1.7, Math.max(0.6, sp / 1.55)); acts.run.timeScale = Math.min(1.4, Math.max(0.75, sp / 4.5));
+      mixer.update(dt);
+      var ct = clamp01(s.climbT || 0);
+      pw.jump += ((st === 'jump' ? 1 : 0) - pw.jump) * kp; pw.fall += ((st === 'fall' ? 1 : 0) - pw.fall) * kp;
+      pw.climb += ((st === 'climb' ? 1 - sm(0.78, 1, ct) : 0) - pw.climb) * kp; pw.dead += ((st === 'dead' ? 1 : 0) - pw.dead) * (1 - Math.exp(-5 * dt));
+      var W = Math.min(1, pw.jump + pw.fall + pw.climb + pw.dead);
+      if (W > 0.004) {
+        var cm = sm(0.3, 0.62, ct), tot = pw.jump + pw.fall + pw.climb + pw.dead;
+        model.getWorldQuaternion(q3).invert();
+        for (var i = 0; i < ORDER.length; i++) {
+          var n = ORDER[i], b = bones[n]; if (!restQ[n]) continue;
+          vd.set(0, 0, 0);
+          var add = function (p, wt) { var d = POSES[p][n]; if (d && wt > 0) { v2.set(d[0], d[1], d[2]).normalize(); vd.addScaledVector(v2, wt); } };
+          add('jump', pw.jump); add('fall', pw.fall); add('hang', pw.climb * (1 - cm)); add('pull', pw.climb * cm); add('dead', pw.dead);
+          if (vd.lengthSq() < 1e-6) continue; vd.normalize();
+          qd.setFromUnitVectors(restDir[n], vd).multiply(restQ[n]);           // desired orientation in character space
+          b.parent.getWorldQuaternion(q2); q2.premultiply(q3).invert();          // parent in character space, inverted
+          q2.multiply(qd);
+          b.quaternion.slerp(q2, W);
+        }
+      }
+      // body lean into turns, death collapse
+      var yaw = group.rotation.y; if (prevYaw === null) prevYaw = yaw;
+      var dy = Math.atan2(Math.sin(yaw - prevYaw), Math.cos(yaw - prevYaw)); prevYaw = yaw;
+      var tl = ground && dt > 0 ? Math.max(-0.16, Math.min(0.16, -dy / dt * 0.022 * clamp01(sp / 4))) : 0;
+      lean += (tl - lean) * (1 - Math.exp(-6 * dt));
+      deadK += ((st === 'dead' ? 1 : 0) - deadK) * (1 - Math.exp(-4 * dt));
+      pivot.rotation.z = lean; pivot.rotation.x = deadK * 1.47 + pw.jump * 0.06 - pw.climb * 0.05; pivot.position.y = deadK * 0.13;
+    }
+    applyVariant();
+    return api;
   };
 })();
