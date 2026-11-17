@@ -426,7 +426,7 @@
     pl.inv = Math.max(0, pl.inv - dt);
     pl.hurtT = (pl.hurtT || 0) + dt; if (pl.hurtT > 5 && pl.hp < 100) pl.hp = Math.min(100, pl.hp + dt * 6);
     if (pl.climb) {
-      const c = pl.climb; pl.climbT += dt / 0.8; const t = pl.climbT;
+      const c = pl.climb; pl.climbT += dt / clamp(0.15 + 0.7 * (c.ty - c.fy), 0.4, 1.5); const t = pl.climbT;   // climb time scales with ledge height: 0.5 m -> 0.5 s, 1.2 m -> 1.0 s, 1.8 m -> 1.4 s
       const a = clamp(t / 0.6, 0, 1), b = clamp((t - 0.5) / 0.5, 0, 1), ea = a * a * (3 - 2 * a), eb = b * b * (3 - 2 * b);
       pl.pos.y = lerp(c.fy, c.ty, ea); pl.pos.x = lerp(c.fx, c.tx, eb); pl.pos.z = lerp(c.fz, c.tz, eb);
       if (t >= 1) { pl.pos.set(c.tx, c.ty, c.tz); pl.climb = null; pl.grounded = true; pl.state = 'idle'; }
