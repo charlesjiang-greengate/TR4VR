@@ -1,0 +1,15 @@
+const fs = require('fs'); const { T, bonesOf } = require('./lib.js');
+const window = { JL: { ext: [] } }; global.window = window;
+let src = fs.readFileSync('/home/user/TR4VR/src/heroine2.js', 'utf8').replace("api._anim = A;", "api._anim = A; api._inst = inst;");
+new Function('window', 'setTimeout', src)(window, () => 0);
+const H = window.createHeroine2(T); const sc = new T.Scene(); sc.add(H.group); const I = H._inst.elder;
+const hs = { state: 'idle', speed: 0, vy: 0, climbT: 0, t: 0 }; const B = bonesOf(I.root);
+for (let i = 0; i < 30; i++) H.update(1 / 60, hs); sc.updateMatrixWorld(true);
+const q0 = B.L_Foot.getWorldQuaternion(new T.Quaternion());
+const e = new T.Euler().setFromQuaternion(q0.clone().multiply(I.footRef[0].clone().invert()), 'YXZ');
+console.log('idle foot vs bind ref: euler YXZ deg', [e.x, e.y, e.z].map(x => (x * 57.3).toFixed(1)), 'toeRest', I.toeRest.toFixed(3));
+hs.state = 'fall'; hs.vy = -0.3; H.update(1e-6, hs); sc.updateMatrixWorld(true);
+console.log('cur pitch', I.limbs[0].cur[6].toFixed(3), I.limbs[1].cur[6].toFixed(3), 'angle after engage', (q0.angleTo(B.L_Foot.getWorldQuaternion(new T.Quaternion())) * 57.3).toFixed(1));
+const ax = (q, x, y, z) => new T.Vector3(x, y, z).applyQuaternion(q).toArray().map(v => v.toFixed(2)).join(',');
+console.log('bind ref axes X', ax(I.footRef[0], 1, 0, 0), 'Y', ax(I.footRef[0], 0, 1, 0)); console.log('idle axes X', ax(q0, 1, 0, 0), 'Y', ax(q0, 0, 1, 0));
+const q1 = B.L_Foot.getWorldQuaternion(new T.Quaternion()); console.log('after axes X', ax(q1, 1, 0, 0), 'Y', ax(q1, 0, 1, 0));
