@@ -25,13 +25,13 @@
   }
   // karst tower: steep sided, rounded top, flared skirt
   function peak(px, pz, R0, H, seed) {
-    var rs = low ? 9 : 14, hs = low ? 7 : 11, base = P.length / 3, sx = seed * 7.31, lean = (h2(seed, 3.3) - 0.5) * 0.25, la = h2(seed, 8.8) * TAU, pe = 1.9 + h2(seed, 5.1) * 1.6;
+    var rs = low ? 10 : 16, hs = low ? 9 : 13, base = P.length / 3, sx = seed * 7.31, lean = (h2(seed, 3.3) - 0.5) * 0.25, la = h2(seed, 8.8) * TAU, pe = 3.0 + h2(seed, 5.1) * 3.5, lo = h2(seed, 1.9);
     for (var j = 0; j <= hs; j++) {
-      var t = j / hs, prof = Math.pow(1 - Math.pow(t, pe), 0.62) * (0.8 + 0.2 * (1 - t)) + Math.pow(1 - t, 5) * 0.75;
+      var t = 1 - Math.pow(1 - j / hs, 1.6), prof = Math.pow(1 - Math.pow(t, pe), 0.7) * (0.72 + 0.28 * (1 - t)) * (1 + 0.13 * (Math.floor(t * 4.5 + lo) % 2)) + Math.pow(1 - t, 6) * 0.45;
       if (j === hs) prof = 0.02;
       for (var i = 0; i <= rs; i++) {
-        var a = (i % rs) / rs * TAU, n = fbm(sx + Math.cos(a) * 1.6 + 3, sx * 0.3 + Math.sin(a) * 1.6 + t * 2.2);
-        var r = R0 * prof * (0.62 + n * 0.8), y = -2 + (H + 2) * (t + (j > 0 && j < hs ? (vn(sx + a * 2, t * 5) - 0.5) * 0.05 : 0));
+        var a = (i % rs) / rs * TAU, n = fbm(sx + Math.cos(a) * 2.5 + 3 + t * 1.3, sx * 0.3 + Math.sin(a) * 2.5 + t * 3.1);
+        var r = R0 * 0.78 * prof * (0.5 + n * 1.0), y = -2 + (H + 2) * (t + (j > 0 && j < hs ? (vn(sx + a * 2, t * 5) - 0.5) * 0.05 : 0));
         var off = lean * H * t * t;
         vert(px + Math.cos(a) * r + Math.cos(la) * off, y, pz + Math.sin(a) * r + Math.sin(la) * off, 0);
       }
@@ -90,7 +90,7 @@
       if (gi === 0) R = Math.max(R, 64 + r0 * 2.5); // keep skirts > 60 m from the map centre
       var px = CX + Math.cos(a) * R, pz = CZ + Math.sin(a) * R;
       peak(px, pz, r0, H, i * 3.17 + gi * 51.3);
-      if (rnd() < 0.5) peak(px + (rnd() - 0.5) * r0 * 2.2, pz + (rnd() - 0.5) * r0 * 2.2, r0 * 0.6, H * (0.45 + rnd() * 0.3), i * 5.9 + gi * 13.1 + 200);
+      if (rnd() < 0.75) peak(px + (rnd() - 0.5) * r0 * 2.2, pz + (rnd() - 0.5) * r0 * 2.2, r0 * 0.6, H * (0.5 + rnd() * 0.4), i * 5.9 + gi * 13.1 + 200);
       if (gi < 2) pagodaSpots.push({ x: px, z: pz, R: R, H: H, r0: r0, a: a, gi: gi });
     }
   });
@@ -118,7 +118,7 @@
   var NOISE = 'float h1(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }' +
     'float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h1(i),h1(i+vec2(1,0)),f.x),mix(h1(i+vec2(0,1)),h1(i+vec2(1,1)),f.x),f.y); }' +
     'float fbm(vec2 p){ return vn(p)*.5+vn(p*2.07+3.1)*.3+vn(p*4.3+7.7)*.2; }';
-  var HAZE = 'vec3 hazeCol(vec3 rd){ float s=max(dot(normalize(rd.xz),normalize(uSun.xz)),0.); return mix(vec3(0.20,0.26,0.36),vec3(0.72,0.44,0.28),pow(s,2.5)*0.85); }';
+  var HAZE = 'vec3 hazeCol(vec3 rd){ float s=max(dot(normalize(rd.xz),normalize(uSun.xz)),0.); return mix(vec3(0.29,0.36,0.47),vec3(0.82,0.52,0.33),pow(s,2.5)*0.85); }';
 
   var mat = new T.ShaderMaterial({
     uniforms: { uSun: { value: sunDir }, uC: { value: new T.Vector3(CX, 0, CZ) } },
@@ -128,14 +128,14 @@
       'void main(){ vec3 n=normalize(vN); vec3 rel=vW-uC; float d=length(rel.xz);' +
       ' float ang=atan(rel.z,rel.x)*d*0.06;' +
       ' float nz=fbm(vW.xz*0.07+vW.y*0.03), fine=fbm(vec2(ang*1.7,vW.y*0.22)), streak=fbm(vec2(ang*2.6,vW.y*0.035));' +
-      ' vec3 rock=mix(vec3(0.15,0.145,0.14),vec3(0.36,0.33,0.29),streak); rock*=0.6+0.75*fine; rock=mix(rock,vec3(0.12,0.12,0.11),smoothstep(0.62,0.8,fbm(vec2(ang*5.,vW.y*0.05)))*0.6);' +
-      ' vec3 forest=mix(vec3(0.035,0.085,0.035),vec3(0.10,0.17,0.055),nz); forest*=0.5+1.0*fine; forest*=0.75+0.5*smoothstep(0.35,0.7,fbm(vW.xz*0.25+vW.y*0.2));' +
-      ' float fm=smoothstep(0.30,0.55,n.y+(nz-0.5)*0.5+(fine-0.5)*0.35); fm=max(fm,smoothstep(0.55,0.75,fbm(vec2(ang*0.9,vW.y*0.09)+4.))*0.85);' +
+      ' vec3 rock=mix(vec3(0.15,0.145,0.14),vec3(0.36,0.33,0.29),streak); rock*=0.6+0.75*fine; rock*=0.6+0.8*fbm(vec2(ang*7.,vW.y*0.03+3.)); rock=mix(rock,vec3(0.12,0.12,0.11),smoothstep(0.62,0.8,fbm(vec2(ang*5.,vW.y*0.05)))*0.6);' +
+      ' vec3 forest=mix(vec3(0.045,0.07,0.04),vec3(0.10,0.125,0.065),nz); forest*=0.5+1.0*fine; forest*=0.75+0.5*smoothstep(0.35,0.7,fbm(vW.xz*0.25+vW.y*0.2));' +
+      ' float fm=smoothstep(0.50,0.72,n.y+(nz-0.5)*0.4+(fine-0.5)*0.3); fm=max(fm,smoothstep(0.62,0.8,fbm(vec2(ang*1.3,vW.y*0.16)+4.))*0.55);' +
       ' vec3 alb=mix(rock,forest,fm);' +
       ' if(vK>0.5) alb=vK>1.5?vec3(0.07,0.085,0.08):mix(vec3(0.30,0.07,0.04),vec3(0.42,0.33,0.24),step(0.5,fract(vW.y*0.5))*0.0+0.15);' +
       ' float dif=max(dot(n,uSun),0.); float wrap=max(dot(n,uSun)*0.5+0.5,0.);' +
       ' vec3 col=alb*(vec3(1.9,1.25,0.78)*dif+vec3(0.22,0.30,0.42)*(0.45+0.55*n.y)+vec3(0.20,0.14,0.09)*wrap);' +
-      ' float hz=1.-exp(-max(d-60.,0.)*0.0078); hz=mix(hz,1.,(1.-smoothstep(-2.,26.+d*0.10,vW.y))*0.55); hz=clamp(hz,0.,0.94);' +
+      ' float hz=1.-exp(-max(d-60.,0.)*0.0060)+smoothstep(190.,340.,d)*0.12; hz=mix(hz,1.,(1.-smoothstep(-2.,22.+d*0.08,vW.y))*0.6); hz=clamp(hz,0.,0.96);' +
       ' vec3 hc=hazeCol(rel); hc=mix(hc,hc*1.25+vec3(0.06,0.05,0.04),1.-smoothstep(0.,40.+d*0.12,vW.y));' +
       ' gl_FragColor=vec4(mix(col,hc,hz),1.); }'
   });

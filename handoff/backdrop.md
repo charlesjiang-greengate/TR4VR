@@ -7,3 +7,6 @@ Assets: none (0 bytes; fully procedural). Sources/licences: none needed — orig
 Known issues: mist bands are simple alpha cylinders (renderOrder −6..−3), so they don't soften near-field transparents;
 unlit by the game's post fog beyond 64 m (own haze instead). Everything is ≥ 60 m from (34,0,38). Original rings kept if init throws.
 Snapshot: yes — tools/snap.js (lowQ) from start, pool court and above the roofs in all 4 directions; no console errors.
+Round 2 (B2): READY — steeper, irregular limestone towers (terraced ledges, rounded summits, more companion spires), grey
+fluted rock faces with desaturated vegetation only on tops/ledges, far ring nearly sky-coloured, denser haze at the feet.
+~34k tris measured in lowQ (normal quality higher, not measured). Snapshot-checked roof + pool views, no console errors.
