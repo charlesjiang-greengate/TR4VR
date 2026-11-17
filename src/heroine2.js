@@ -139,7 +139,7 @@ window.createHeroine2 = function (THREE) {
     var st = s.state, sp = s.speed || 0, tI = 0, tW = 0, tR = 0, tsW = 1, tsR = 1;
     var natW = NAT.walk * I.scale, natR = NAT.run * I.scale;
     if (st === 'run') { var k = sm(1.9, 3.8, sp); tR = k; tW = 1 - k; tsW = Math.min(2.0, Math.max(0.6, sp / natW)); tsR = Math.min(1.35, Math.max(0.6, sp / natR)); }
-    else if (st === 'jump' || st === 'fall') { tI = 1; }   // neutral base in the air; the movement layer poses the tuck / reach / landing
+    else if (st === 'jump' || st === 'fall') { tR = 1; tsR = 0.16; }
     else tI = 1;
     var kk = 1 - Math.exp(-dt * 11);
     I.w.idle += (tI - I.w.idle) * kk; I.w.walk += (tW - I.w.walk) * kk; I.w.run += (tR - I.w.run) * kk;
@@ -157,8 +157,8 @@ window.createHeroine2 = function (THREE) {
     rot(I.spine, 0, 0, 1, lean);
     if (air > 0.01) {
       var up = s.vy > 0 ? 1 : 0;
-      rot(I.lArm, 0, 0, 1, -0.22 * air); rot(I.rArm, 0, 0, 1, 0.22 * air);       // arms out for balance
-      // (removed: rotation about the upper-arm bone's long axis twisted the arms in the air)
+      rot(I.lArm, 0, 0, 1, -0.55 * air); rot(I.rArm, 0, 0, 1, 0.55 * air);       // arms out for balance
+      rot(I.lArm, 1, 0, 0, -0.5 * air * up); rot(I.rArm, 1, 0, 0, -0.5 * air * up);
       rot(I.spine, 1, 0, 0, 0.12 * air);
     }
     if (climb > 0.01) {
