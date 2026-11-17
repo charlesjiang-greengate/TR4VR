@@ -62,12 +62,19 @@ window.createHeroine2 = function (THREE) {
   function tex(url, srgb) {
     var t = tl.load(url); t.flipY = false; t.anisotropy = 4; if (srgb) t.encoding = THREE.sRGBEncoding; return t;
   }
+  // material shows a neutral colour until its texture has actually arrived (never a black silhouette)
+  function mat(url, color, opts) {
+    var m = new THREE.MeshStandardMaterial(Object.assign({ color: color, metalness: 0, envMapIntensity: 0.7 }, opts || {}));
+    tl.load(url, function (t) { t.flipY = false; t.anisotropy = 4; t.encoding = THREE.sRGBEncoding; m.map = t; m.color.set(0xffffff); m.needsUpdate = true; }, undefined, function () { console.warn('heroine2: texture missing', url); });
+    return m;
+  }
   function build(name, gltf, clips) {
     var v = VARS[name], root = gltf.scene, I = { root: root, bones: {}, w: { idle: 1, walk: 0, run: 0 }, act: {} };
     root.scale.setScalar(v.h / v.raw);
-    var mBody = new THREE.MeshStandardMaterial({ map: tex(v.body, true), roughness: 0.78, metalness: 0, envMapIntensity: 0.7 });
-    var mHead = new THREE.MeshStandardMaterial({ map: tex(v.head, true), roughness: 0.62, metalness: 0, envMapIntensity: 0.7 });
+    var mBody = mat(v.body, name === 'elder' ? 0xb9b4ae : 0xc79aa6, { roughness: 0.78 });
+    var mHead = mat(v.head, 0x6b4a3c, { roughness: 0.62 });
     var mHair = v.hair ? new THREE.MeshStandardMaterial({ map: tex(v.hair, true), roughness: 0.55, metalness: 0, alphaTest: 0.4, side: THREE.DoubleSide, envMapIntensity: 0.6 }) : null;
+    if (mHair) mHair.visible = false, tl.load(v.hair, function () { mHair.visible = true; });
     root.traverse(function (o) {
       if (o.isBone) I.bones[o.name] = o;
       if (!o.isMesh) return;
