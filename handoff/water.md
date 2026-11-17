@@ -6,5 +6,5 @@ normal-map ripples, floor caustic shimmer, expanding wake rings around the playe
 Root cause of the old "flat olive" look: the outer ground disc (CircleGeometry r=420, game.js ~l.190) sits at y=-0.25,
 coplanar with the water and above the pool bed. The ext cuts a pool-sized hole in that disc at runtime (no file edits).
 Sources/licences: no external assets; three.js r147 `THREE.Water` (MIT) already in the page; shaders original.
-Known issues: wake/koi not individually verified in snapshots (koi are small); reflection sky is tone-compressed and
-cooled on purpose. Snapshot-checked: yes (pool, sun-facing and in-water views, no console errors).
+Known issues: koi only confirmed rendering at a 4x debug scale (at final size the one in view was under a lily pad);
+reflected sky is deliberately tone-compressed/cooled. Snapshot-checked: yes (pool, sun-facing, in-water, wake ring).
