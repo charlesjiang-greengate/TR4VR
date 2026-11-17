@@ -446,7 +446,9 @@
     // jump buffering + coyote time; wading auto-climbs out of the pool
     if (jumpQ) { jumpQ = false; pl.jbuf = 0.13; }
     pl.jbuf = (pl.jbuf || 0) - dt; pl.coy = pl.grounded ? 0.1 : (pl.coy || 0) - dt;
-    if (pl.jbuf > 0) { if (il > 0.1 && tryMantle()) pl.jbuf = 0; else if (pl.coy > 0) { pl.vel.y = 6.7; pl.grounded = false; pl.jumped = true; pl.coy = 0; pl.jbuf = 0; } }
+    if (pl.jbuf > 0) { if (il > 0.1 && tryMantle()) pl.jbuf = 0; else if (pl.coy > 0) { pl.vel.y = 6.7; pl.grounded = false; pl.jumped = true; pl.coy = 0; pl.jbuf = 0; pl.jcut = !!keys.Space; } }
+    // variable jump height: releasing Space early gives a short hop (keyboard only; touch and scripted jumps are always full)
+    if (pl.jcut && !pl.grounded && !keys.Space) { if (pl.vel.y > 2) pl.vel.y = 2; pl.jcut = false; }
     else if (pl.grounded && wade && il > 0.1) tryMantle();
     if (pl.climb) return;
     const prevY = pl.pos.y;
@@ -538,7 +540,8 @@
     }
     camPitch = clamp(camPitch, -0.55, 1.2);
     const tgt = tmp.set(pl.pos.x, pl.pos.y + 1.45, pl.pos.z);
-    camTarget.lerp(tgt, 1 - Math.exp(-14 * dt));
+    { const kxz = 1 - Math.exp(-14 * dt), ky = 1 - Math.exp(-(pl.grounded ? 8 : 12) * dt);   // softer vertical follow: no jitter on steps
+      camTarget.x = lerp(camTarget.x, tgt.x, kxz); camTarget.z = lerp(camTarget.z, tgt.z, kxz); camTarget.y = lerp(camTarget.y, tgt.y, ky); }
     if (mode === 'win') { winT += dt; camYaw += dt * 0.25; }
     const cp = Math.cos(camPitch), d = new T.Vector3(-Math.sin(camYaw) * cp, Math.sin(camPitch), -Math.cos(camYaw) * cp);
     const want = mode === 'win' ? 3.4 : 4.3;
