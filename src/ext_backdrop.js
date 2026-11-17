@@ -25,9 +25,9 @@
   }
   // karst tower: steep sided, rounded top, flared skirt
   function peak(px, pz, R0, H, seed) {
-    var rs = low ? 9 : 14, hs = low ? 7 : 11, base = P.length / 3, sx = seed * 7.31, lean = (h2(seed, 3.3) - 0.5) * 0.25, la = h2(seed, 8.8) * TAU;
+    var rs = low ? 9 : 14, hs = low ? 7 : 11, base = P.length / 3, sx = seed * 7.31, lean = (h2(seed, 3.3) - 0.5) * 0.25, la = h2(seed, 8.8) * TAU, pe = 1.9 + h2(seed, 5.1) * 1.6;
     for (var j = 0; j <= hs; j++) {
-      var t = j / hs, prof = Math.pow(1 - t, 0.5) * (0.62 + 0.38 * (1 - t)) + Math.pow(1 - t, 6) * 0.9;
+      var t = j / hs, prof = Math.pow(1 - Math.pow(t, pe), 0.62) * (0.8 + 0.2 * (1 - t)) + Math.pow(1 - t, 5) * 0.75;
       if (j === hs) prof = 0.02;
       for (var i = 0; i <= rs; i++) {
         var a = (i % rs) / rs * TAU, n = fbm(sx + Math.cos(a) * 1.6 + 3, sx * 0.3 + Math.sin(a) * 1.6 + t * 2.2);
@@ -86,14 +86,18 @@
     ridge(g.ridge[0], g.ridge[1], g.ridge[2], 11.3 + gi * 17.7);
     for (var i = 0; i < g.n; i++) {
       var a = (i + rnd() * 0.8) / g.n * TAU, R = g.R + (rnd() - 0.5) * 50, H = g.h0 + (g.h1 - g.h0) * Math.pow(rnd(), 1.4), r0 = g.r0 + (g.r1 - g.r0) * rnd();
-      if (gi === 0 && R < 112) R = 112;
       r0 *= 0.75 + H / g.h1 * 0.45;
+      if (gi === 0) R = Math.max(R, 64 + r0 * 2.5); // keep skirts > 60 m from the map centre
       var px = CX + Math.cos(a) * R, pz = CZ + Math.sin(a) * R;
       peak(px, pz, r0, H, i * 3.17 + gi * 51.3);
       if (rnd() < 0.5) peak(px + (rnd() - 0.5) * r0 * 2.2, pz + (rnd() - 0.5) * r0 * 2.2, r0 * 0.6, H * (0.45 + rnd() * 0.3), i * 5.9 + gi * 13.1 + 200);
       if (gi < 2) pagodaSpots.push({ x: px, z: pz, R: R, H: H, r0: r0, a: a, gi: gi });
     }
   });
+  for (var m = 0; m < (low ? 9 : 16); m++) {
+    var ma = (m + rnd() * 0.7) / (low ? 9 : 16) * TAU, mr = 10 + rnd() * 6, mR = Math.max(104 + rnd() * 26, 64 + mr * 2.5);
+    peak(CX + Math.cos(ma) * mR, CZ + Math.sin(ma) * mR, mr, 6 + rnd() * 9, 500 + m * 2.3);
+  }
   // pagodas on low hills / shoulders in front of the towers, spread around the compass
   var want = [0.35, 1.6, 2.75, 3.9, 4.6, 5.6], used = 0;
   want.forEach(function (wa, wi) {
@@ -101,7 +105,7 @@
     pagodaSpots.forEach(function (s) { var d = Math.abs(((s.a - wa + Math.PI * 3) % TAU) - Math.PI); if (s.gi === (wi % 2) && d < bd) { bd = d; best = s; } });
     if (!best) return;
     var R = best.R - best.r0 * 0.95 - 4, x = CX + Math.cos(best.a + 0.05) * R, z = CZ + Math.sin(best.a + 0.05) * R, hill = best.gi ? 22 : 10, s = best.gi ? 2.3 : 1.35;
-    if (R < 80) return;
+    R = Math.max(R, 64 + 9 * s * 2.5);
     peak(x, z, 9 * s, hill, 900 + wi * 7.7);
     pagoda(x, hill * 0.86, z, s, wi % 3 === 0 ? 5 : 4); used++;
   });
@@ -114,7 +118,7 @@
   var NOISE = 'float h1(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }' +
     'float vn(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h1(i),h1(i+vec2(1,0)),f.x),mix(h1(i+vec2(0,1)),h1(i+vec2(1,1)),f.x),f.y); }' +
     'float fbm(vec2 p){ return vn(p)*.5+vn(p*2.07+3.1)*.3+vn(p*4.3+7.7)*.2; }';
-  var HAZE = 'vec3 hazeCol(vec3 rd){ float s=max(dot(normalize(rd.xz),normalize(uSun.xz)),0.); return mix(vec3(0.27,0.33,0.42),vec3(0.80,0.50,0.32),pow(s,2.5)*0.85); }';
+  var HAZE = 'vec3 hazeCol(vec3 rd){ float s=max(dot(normalize(rd.xz),normalize(uSun.xz)),0.); return mix(vec3(0.20,0.26,0.36),vec3(0.72,0.44,0.28),pow(s,2.5)*0.85); }';
 
   var mat = new T.ShaderMaterial({
     uniforms: { uSun: { value: sunDir }, uC: { value: new T.Vector3(CX, 0, CZ) } },
@@ -124,14 +128,14 @@
       'void main(){ vec3 n=normalize(vN); vec3 rel=vW-uC; float d=length(rel.xz);' +
       ' float ang=atan(rel.z,rel.x)*d*0.06;' +
       ' float nz=fbm(vW.xz*0.07+vW.y*0.03), fine=fbm(vec2(ang*1.7,vW.y*0.22)), streak=fbm(vec2(ang*2.6,vW.y*0.035));' +
-      ' vec3 rock=mix(vec3(0.20,0.19,0.18),vec3(0.46,0.43,0.38),streak); rock*=0.72+0.5*fine; rock=mix(rock,vec3(0.12,0.12,0.11),smoothstep(0.62,0.8,fbm(vec2(ang*5.,vW.y*0.05)))*0.6);' +
-      ' vec3 forest=mix(vec3(0.035,0.085,0.035),vec3(0.10,0.17,0.055),nz); forest*=0.65+0.7*fine;' +
+      ' vec3 rock=mix(vec3(0.15,0.145,0.14),vec3(0.36,0.33,0.29),streak); rock*=0.6+0.75*fine; rock=mix(rock,vec3(0.12,0.12,0.11),smoothstep(0.62,0.8,fbm(vec2(ang*5.,vW.y*0.05)))*0.6);' +
+      ' vec3 forest=mix(vec3(0.035,0.085,0.035),vec3(0.10,0.17,0.055),nz); forest*=0.5+1.0*fine; forest*=0.75+0.5*smoothstep(0.35,0.7,fbm(vW.xz*0.25+vW.y*0.2));' +
       ' float fm=smoothstep(0.30,0.55,n.y+(nz-0.5)*0.5+(fine-0.5)*0.35); fm=max(fm,smoothstep(0.55,0.75,fbm(vec2(ang*0.9,vW.y*0.09)+4.))*0.85);' +
       ' vec3 alb=mix(rock,forest,fm);' +
       ' if(vK>0.5) alb=vK>1.5?vec3(0.07,0.085,0.08):mix(vec3(0.30,0.07,0.04),vec3(0.42,0.33,0.24),step(0.5,fract(vW.y*0.5))*0.0+0.15);' +
       ' float dif=max(dot(n,uSun),0.); float wrap=max(dot(n,uSun)*0.5+0.5,0.);' +
       ' vec3 col=alb*(vec3(1.9,1.25,0.78)*dif+vec3(0.22,0.30,0.42)*(0.45+0.55*n.y)+vec3(0.20,0.14,0.09)*wrap);' +
-      ' float hz=1.-exp(-max(d-70.,0.)*0.0058); hz=mix(hz,1.,(1.-smoothstep(-2.,26.+d*0.10,vW.y))*0.55); hz=clamp(hz,0.,0.93);' +
+      ' float hz=1.-exp(-max(d-70.,0.)*0.0036); hz=mix(hz,1.,(1.-smoothstep(-2.,26.+d*0.10,vW.y))*0.55); hz=clamp(hz,0.,0.9);' +
       ' vec3 hc=hazeCol(rel); hc=mix(hc,hc*1.25+vec3(0.06,0.05,0.04),1.-smoothstep(0.,40.+d*0.12,vW.y));' +
       ' gl_FragColor=vec4(mix(col,hc,hz),1.); }'
   });
@@ -147,11 +151,11 @@
         'void main(){ float x=vU.x*26.+uTime*uSp+uSeed; float n=fbm(vec2(x,vU.y*2.2+uSeed))*0.65+fbm(vec2(x*2.3+9.,vU.y*5.-uTime*uSp*0.5))*0.35;' +
         ' float seam=smoothstep(0.,0.03,vU.x)*smoothstep(1.,0.97,vU.x);' +
         ' float a=smoothstep(0.30,0.72,n)*pow(1.-vU.y,1.6)*smoothstep(0.,0.06,vU.y)*uA; a=mix(a,max(a,uA*0.55*(1.-vU.y)*(1.-vU.y)),0.7)*mix(0.75,1.,seam);' +
-        ' vec3 c=hazeCol(vR)*1.35+vec3(0.10,0.09,0.09); gl_FragColor=vec4(c,a); }'
+        ' vec3 c=hazeCol(vR)*1.3+vec3(0.07,0.065,0.07); gl_FragColor=vec4(c,a); }'
     });
   };
   var mists = [];
-  [[350, 0, 95, 0.55, 0.010, -3], [262, 0, 62, 0.62, 0.016, -4], [176, 0, 40, 0.66, 0.022, -5], [100, 0, 20, 0.5, 0.030, -6]].forEach(function (m, i) {
+  [[352, 0, 70, 0.5, 0.010, -3], [262, 0, 46, 0.55, 0.016, -4], [178, 0, 30, 0.55, 0.022, -5], [104, 0, 14, 0.4, 0.030, -6]].forEach(function (m, i) {
     var g = new T.CylinderGeometry(m[0], m[0], m[2], low ? 48 : 96, 1, true); g.translate(0, m[1] + m[2] / 2 - 2, 0);
     var mesh = new T.Mesh(g, mistMat(i * 13.7 + 2, m[3], m[4])); mesh.position.set(CX, 0, CZ); mesh.renderOrder = m[5]; mesh.frustumCulled = false; mists.push(mesh);
   });
