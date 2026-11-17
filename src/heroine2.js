@@ -163,12 +163,24 @@ window.createHeroine2 = function (THREE) {
     }
     if (climb > 0.01) {
       var c = cl(s.climbT || 0);
-      var reach = (1 - sm(0.45, 0.95, c)) * climb, knee = sm(0.4, 0.7, c) * (1 - sm(0.8, 1, c)) * climb;
-      rot(I.lArm, 1, 0, 0, -2.75 * reach); rot(I.rArm, 1, 0, 0, -2.75 * reach);
-      rot(I.lFore, 1, 0, 0, -0.5 * reach * sm(0.2, 0.6, c)); rot(I.rFore, 1, 0, 0, -0.5 * reach * sm(0.2, 0.6, c));
+      // hands stay planted on the ledge while the body rises (same 0..0.6 smoothstep as the position lerp in updatePlayer):
+      // overhead hang -> bent-elbow pull -> straight-arm press beside the hips, then release as she steps onto the top
+      var up = 1 - sm(0, 0.6, c), bell = 4 * up * (1 - up), rel = (1 - sm(0.72, 1, c)) * climb, knee = sm(0.4, 0.7, c) * (1 - sm(0.8, 1, c)) * climb;
+      var armA = -(0.3 + 2.55 * up) * rel;
+      rot(I.lArm, 1, 0, 0, armA); rot(I.rArm, 1, 0, 0, armA);
+      rot(I.lArm, 0, 0, 1, -0.18 * bell * rel); rot(I.rArm, 0, 0, 1, 0.18 * bell * rel);
+      rot(I.lFore, 1, 0, 0, -1.15 * bell * rel); rot(I.rFore, 1, 0, 0, -1.15 * bell * rel);
       rot(I.rThigh, 1, 0, 0, -1.25 * knee); rot(I.rCalf, 1, 0, 0, 1.5 * knee);
       rot(I.lThigh, 1, 0, 0, 0.25 * knee);
-      rot(I.spine, 1, 0, 0, 0.3 * knee);
+      rot(I.spine, 1, 0, 0, 0.3 * knee + 0.22 * bell * rel);
+      rot(I.head, 1, 0, 0, -0.3 * up * rel);
+    }
+    if (dead > 0.01) {                                                                 // knees buckle and she curls as she goes down
+      var db = 4 * dead * (1 - dead);
+      rot(I.lThigh, 1, 0, 0, -0.7 * db); rot(I.rThigh, 1, 0, 0, -0.45 * db);
+      rot(I.lCalf, 1, 0, 0, 1.3 * db); rot(I.rCalf, 1, 0, 0, 1.0 * db);
+      rot(I.spine, 1, 0, 0, 0.35 * db); rot(I.head, 1, 0, 0, 0.3 * dead);
+      rot(I.lArm, 0, 0, 1, -0.5 * dead); rot(I.rArm, 0, 0, 1, 0.35 * dead);
     }
     pivot.rotation.x = dead * 1.5; pivot.position.y = dead * 0.14; pivot.position.z = -dead * 0.3;
   }

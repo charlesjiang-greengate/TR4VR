@@ -1,12 +1,12 @@
 # Task M — movement (handoff)
-Status: PARTIAL (safe to merge: one new file, nothing existing edited, home branch 8a9f86a merged in)
-Adds `src/ext_movement.js` only (no assets). It wraps `ctx.heroine.update` and layers procedural Bip01 bone overrides on
-top of the base clips: jump tuck driven by `s.vy`, extended fall (arms rise, legs reach), landing knee-bend recovery scaled
-by impact speed, hurt flinch (from a `pl.hp` drop via `ctx.onUpdate`), wading balance (`y < -0.35`), idle breathing /
-weight shift / look-around. No loop line needed, no new `hs` fields, allocation-free per frame, try/catch wrapped.
-Not done: real jump clips, new ledge-climb pose, foot-slide matching, controller feel (`updatePlayer`, camera). Those need
-edits to `heroine2.js` / `game.js`; my session brief was add-only, so game logic, physics and routes are untouched.
-Assets: none. Sources/licences: none (original code).
-Verified: build OK; headless snapshots (fall, landing) show the poses applied, rig found (10 bones), no errors thrown,
-`JL.debug.sim` run + jump unchanged. Not verified: tuck pose visually (camera was blocked), younger variant, route tests
-(not re-run; no game logic changed).
+Status: PARTIAL (builds, routes t2 + t4 print mode:win with no STUCK; home branch 8a9f86a merged in)
+Changed: `src/ext_movement.js` (new) — procedural layer over `heroine.update`: jump tuck driven by `s.vy`, extended fall,
+landing knee-bend scaled by impact speed, hurt flinch (from `pl.hp` drop), wading balance, idle breathing / look.
+`src/heroine2.js` `update` — ledge climb reworked to follow the same 0..0.6 smoothstep as the position lerp (overhead hang →
+bent-elbow pull → press beside hips → knee up → release), plus a knee-buckle / curl on `dead`.
+`src/game.js` — `updatePlayer`: variable jump height (release Space early = short hop; touch and scripted jumps stay full,
+so reach is unchanged: apex 1.1 m); `updateCamera`: softer vertical follow (no jitter on steps). Nothing else touched.
+No loop line needed, no new `hs` fields, no assets, no external sources (original code).
+Verified by snapshot: fall, landing and dead poses; rig found (10 bones); no errors thrown. Routes t1/t3/t5 print neither
+win nor STUCK (not checked against the base). Not visually confirmed: climb pose, jump tuck, younger variant.
+Not done: real Rocketbox jump clips, foot-slide matching beyond the existing timeScale, turn-around, anticipation.
