@@ -59,7 +59,7 @@
       '  vec2 n3 = texture2D(normalSampler, p * 0.47 + vec2(t * 0.021, -t * 0.018)).xy * 2.0 - 1.0;',
       '  float fade = 1.0 / (1.0 + dist * 0.035);',
       '  vec2 g = (n1 + n2 * 0.7 + n3 * 0.4 * fade) * 0.085;',
-      '  vec2 rg = rings(p); g += rg * 0.55;',
+      '  vec2 rg = rings(p); g += rg * 0.8;',
       '  vec3 N = normalize(vec3(g.x, 1.0, g.y));',
       '  float ndv = clamp(dot(N, V), 0.0, 1.0);',
       '  float F = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);',
@@ -73,7 +73,7 @@
       // depth-tinted transmission: path length of the refracted ray down to the pool floor
       '  float sin2 = (1.0 - ndv * ndv) / 1.77; float cosT = sqrt(1.0 - sin2);',
       '  float path = uDepth / max(cosT, 0.2);',
-      '  vec3 ext = vec3(3.0, 0.85, 1.1);',
+      '  vec3 ext = vec3(2.3, 0.8, 1.05);',
       '  vec3 trans = exp(-ext * path);',
       '  float absorb = 1.0 - dot(trans, vec3(0.3333));',
       // caustic shimmer projected onto the floor under the surface
@@ -86,7 +86,7 @@
       '  vec3 H = normalize(V + L); float ndh = max(dot(N, H), 0.0);',
       '  vec3 spec = uSunCol * (pow(ndh, 900.0) * 3.0 + pow(ndh, 120.0) * 0.06);',
       '  float crest = clamp(length(rg) * 1.6, 0.0, 1.0);',
-      '  vec3 col = refl * F + under * (1.0 - F) + spec + uSkyTint * crest * 0.10;',
+      '  vec3 col = refl * F + under * (1.0 - F) + spec + uSkyTint * crest * 0.16;',
       filter ? '  gl_FragColor = vec4(trans * (1.0 - F) * (1.0 - crest * 0.15), 1.0);' : '  gl_FragColor = vec4(col, 1.0);',
       '}'].join('\n'); };
     mat.fragmentShader = frag(false);
@@ -124,15 +124,16 @@
     // ---------- koi (optional, cheap: 6 small meshes under the surface) ----------
     var koi = [];
     try {
-      var kg = new T.SphereGeometry(1, 10, 6); kg.scale(0.07, 0.05, 0.26);
+      var kg = new T.SphereGeometry(1, 10, 6); kg.scale(0.085, 0.06, 0.31);
       var tg = new T.ConeGeometry(0.07, 0.16, 4); tg.rotateX(-Math.PI / 2); tg.scale(0.25, 1, 1); tg.translate(0, 0, -0.08);
       var cols = [0xe8541a, 0xf2efe6, 0xe8541a, 0xd9a21c, 0xf2efe6, 0xc23a12];
       var r = ctx.rng ? ctx.rng(7719) : Math.random;
+      var home = [[39.8, 39.6], [28.5, 29.5], [28.5, 39.5], [39.5, 29.0], [34.0, 28.1], [28.9, 34.4]]; // clear of island + stepping stones
       for (var k = 0; k < (lowQ ? 3 : 6); k++) {
-        var km = new T.MeshStandardMaterial({ color: cols[k], roughness: 0.45, metalness: 0.0 });
+        var wht = cols[k] === 0xf2efe6, km = new T.MeshStandardMaterial({ color: cols[k], roughness: 0.45, metalness: 0.0, emissive: wht ? 0xffd9cc : 0xff3206, emissiveIntensity: wht ? 2.0 : 4.0 }); // bright + red-shifted: the water pass absorbs most red
         var g = new T.Group(), body = new T.Mesh(kg, km), tail = new T.Mesh(tg, km);
-        tail.position.z = -0.24; g.add(body); g.add(tail);
-        g.userData = { rad: 6.2 + r() * 2.6, ph: r() * 6.283, sp: (0.07 + r() * 0.05) * (r() < 0.5 ? -1 : 1), y: -0.62 - r() * 0.16, wob: 0.6 + r() * 0.8, tail: tail };
+        tail.position.z = -0.29; g.add(body); g.add(tail); g.scale.setScalar(1.45);
+        g.userData = { hx: home[k][0], hz: home[k][1], rad: 1.5 + r() * 0.5, ph: r() * 6.283, sp: (0.2 + r() * 0.14) * (r() < 0.5 ? -1 : 1), y: -0.5 - r() * 0.14, wob: 0.6 + r() * 0.8, tail: tail };
         ctx.scene.add(g); koi.push(g);
       }
     } catch (e) { console.warn('ext_water koi', e); }
@@ -158,10 +159,10 @@
         wasIn = inW; lx = px; lz = pz;
       }
       for (var i = 0; i < koi.length; i++) {
-        var g = koi[i], d = g.userData, a = d.ph + time * d.sp, rr = d.rad + Math.sin(time * 0.21 * d.wob + d.ph) * 0.9;
-        var x = 34 + Math.cos(a) * rr, z = 34 + Math.sin(a) * rr * 0.92;
+        var g = koi[i], d = g.userData, a = d.ph + time * d.sp, rr = d.rad + Math.sin(time * 0.21 * d.wob + d.ph) * 0.3, sg = d.sp > 0 ? 1 : -1;
+        var x = d.hx + Math.cos(a) * rr, z = d.hz + Math.sin(a) * rr * 0.8;
         g.position.set(x, d.y, z);
-        g.rotation.y = -a + (d.sp > 0 ? 0 : Math.PI) + Math.sin(time * 3.1 * d.wob + d.ph) * 0.18;
+        g.rotation.y = Math.atan2(-Math.sin(a) * sg, Math.cos(a) * 0.8 * sg) + Math.sin(time * 3.1 * d.wob + d.ph) * 0.18;
         d.tail.rotation.y = Math.sin(time * 6.5 * d.wob + d.ph) * 0.6;
       }
     });
