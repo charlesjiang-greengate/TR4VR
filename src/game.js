@@ -599,7 +599,7 @@
     window.__frames = (window.__frames || 0) + 1;
     if (window.JL_NORENDER) return;
     if (!window.JL_MANUAL) requestAnimationFrame(frame);
-    const rdt = (now - last) / 1000; last = now; const dt = Math.min(0.05, rdt); time += dt;
+    const rdt = Math.max(0, (now - last) / 1000); last = now; const dt = Math.min(0.05, rdt); time += dt;
     updatePlayer(dt); updateEntities(dt);
     for (const f of extUpd) { try { f(dt, time, pl, camera); } catch (e) { if (!f.err) { f.err = 1; console.warn('ext update', e); } } }
     heroine.group.position.copy(pl.pos); heroine.group.rotation.y = pl.yaw;
