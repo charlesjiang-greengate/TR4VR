@@ -135,7 +135,7 @@
       ' if(vK>0.5) alb=vK>1.5?vec3(0.07,0.085,0.08):mix(vec3(0.30,0.07,0.04),vec3(0.42,0.33,0.24),step(0.5,fract(vW.y*0.5))*0.0+0.15);' +
       ' float dif=max(dot(n,uSun),0.); float wrap=max(dot(n,uSun)*0.5+0.5,0.);' +
       ' vec3 col=alb*(vec3(1.9,1.25,0.78)*dif+vec3(0.22,0.30,0.42)*(0.45+0.55*n.y)+vec3(0.20,0.14,0.09)*wrap);' +
-      ' float hz=1.-exp(-max(d-70.,0.)*0.0036); hz=mix(hz,1.,(1.-smoothstep(-2.,26.+d*0.10,vW.y))*0.55); hz=clamp(hz,0.,0.9);' +
+      ' float hz=1.-exp(-max(d-60.,0.)*0.0078); hz=mix(hz,1.,(1.-smoothstep(-2.,26.+d*0.10,vW.y))*0.55); hz=clamp(hz,0.,0.94);' +
       ' vec3 hc=hazeCol(rel); hc=mix(hc,hc*1.25+vec3(0.06,0.05,0.04),1.-smoothstep(0.,40.+d*0.12,vW.y));' +
       ' gl_FragColor=vec4(mix(col,hc,hz),1.); }'
   });

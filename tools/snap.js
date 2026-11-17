@@ -20,8 +20,9 @@ const OUT=process.env.OUT||__dirname, HTML=process.env.HTML||(__dirname+'/../jad
  const steps=JSON.parse(process.env.STEPS||'[]'); let started=false;
  for(const s of steps){
   if(s.name!=='title'&&!started){ started=true; await p.evaluate(()=>document.getElementById('start').click()); }
+  if(s.wait) await p.waitForTimeout(s.wait);
   const d=await p.evaluate(s=>{const d=JL.debug; if(s.tp)d.tp(...s.tp); if(s.cam)d.cam=s.cam; let r; if(s.js)r=eval(s.js); return [JL.debug.snap(s.frames||3),String(r)];},s);
-  if(s.js)console.log(s.name,'=>',d[1]);
+  if(s.js)console.log(s.name,'=>',d[1]); if(s.dom){ await p.waitForTimeout(400); await p.screenshot({path:OUT+'/dom_'+s.name+'.png',timeout:60000}); }
   fs.writeFileSync(OUT+'/snap_'+s.name+'.jpg',Buffer.from(d[0].split(',')[1],'base64'));
  }
  console.log(errs.slice(0,25).join('\n')||'no errors');
