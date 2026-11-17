@@ -292,7 +292,7 @@
   // ---------- water ----------
   let water = null;
   try {
-    water = new T.Water(new T.PlaneGeometry(20, 20), { textureWidth: lowQ ? 512 : 1024, textureHeight: lowQ ? 512 : 1024, waterNormals: JL.waterNormals, sunDirection: sunDir.clone(), sunColor: 0xffb070, waterColor: 0x0a2a24, distortionScale: 0.55, fog: false });
+    water = new T.Water(new T.PlaneGeometry(20, 20), { textureWidth: lowQ ? 512 : 1024, textureHeight: lowQ ? 512 : 1024, waterNormals: JL.waterNormals, sunDirection: sunDir.clone(), sunColor: 0x5a4630, waterColor: 0x0a2a24, distortionScale: 0.4, fog: false });
     water.rotation.x = -Math.PI / 2; water.position.set(34, -0.25, 34); water.material.uniforms.size.value = 0.35;
     water.material.uniforms.mirrorSampler.value.type = T.HalfFloatType;
     scene.add(water);

@@ -686,7 +686,7 @@ button{font:inherit;color:inherit;cursor:pointer;}
     try {
       if (THREE.GLTFLoader) {
         var loader = new THREE.GLTFLoader();
-        loader.load('assets/char/heroine.glb', function (g) { loader.load('assets/char/anims.glb', function (a) { try { setup(g, a); } catch (e) { fail(e); } }, undefined, fail); }, undefined, fail);
+        loader.load('assets/char/heroine.glb.wasm', function (g) { loader.load('assets/char/anims.glb.wasm', function (a) { try { setup(g, a); } catch (e) { fail(e); } }, undefined, fail); }, undefined, fail);
       }
     } catch (e) { fail(e); }
 
@@ -2496,7 +2496,7 @@ window.JL = {};
       if (!hdrDone) { try { bakeEnv(skyMat(t, true, 0.9, 4.0, 0.25)); } catch (e) { console.warn('env jpg', e); } }
     }, undefined, () => { });
     if (T.RGBELoader) {
-      new T.RGBELoader().load(base + 'sky_1k.hdr', t => {
+      new T.RGBELoader().load(base + 'sky_1k.hdr.wasm', t => {
         t.wrapS = T.RepeatWrapping; t.wrapT = T.ClampToEdgeWrapping; t.minFilter = T.LinearFilter; t.magFilter = T.LinearFilter; t.generateMipmaps = false;
         try { bakeEnv(skyMat(t, false, 0.85, 6.0, 0.0)); hdrDone = true; } catch (e) { console.warn('env hdr', e); }
       }, undefined, () => { });
@@ -2801,7 +2801,7 @@ window.JL = {};
   // ---------- water ----------
   let water = null;
   try {
-    water = new T.Water(new T.PlaneGeometry(20, 20), { textureWidth: lowQ ? 512 : 1024, textureHeight: lowQ ? 512 : 1024, waterNormals: JL.waterNormals, sunDirection: sunDir.clone(), sunColor: 0xffb070, waterColor: 0x0a2a24, distortionScale: 0.55, fog: false });
+    water = new T.Water(new T.PlaneGeometry(20, 20), { textureWidth: lowQ ? 512 : 1024, textureHeight: lowQ ? 512 : 1024, waterNormals: JL.waterNormals, sunDirection: sunDir.clone(), sunColor: 0x5a4630, waterColor: 0x0a2a24, distortionScale: 0.4, fog: false });
     water.rotation.x = -Math.PI / 2; water.position.set(34, -0.25, 34); water.material.uniforms.size.value = 0.35;
     water.material.uniforms.mirrorSampler.value.type = T.HalfFloatType;
     scene.add(water);

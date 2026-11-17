@@ -9,7 +9,7 @@ const OUT=process.env.OUT||__dirname, HTML=process.env.HTML||(__dirname+'/../jad
  await p.addInitScript(()=>{window.JL_FIXED_SCALE=1;window.JL_MANUAL=1;window.JL_LOWQ=1;});
  const html='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">'+fs.readFileSync(HTML,'utf8')+'</body></html>';
  await p.route('**/*',async route=>{const u=route.request().url();
-   if(u.startsWith('http://local/assets/')){ try{ return route.fulfill({body:fs.readFileSync(__dirname+'/../'+decodeURIComponent(u.slice(13)).split('?')[0])}); }catch(e){ return route.fulfill({status:404,body:''}); } }
+   if(u.startsWith('http://local/assets/')){ try{ return route.fulfill({body:fs.readFileSync(__dirname+'/../'+decodeURIComponent(u.slice(13)).split('?')[0].replace(/\.wasm$/,''))}); }catch(e){ return route.fulfill({status:404,body:''}); } }
    if(u.startsWith('http://local/')) return route.fulfill({contentType:'text/html',body:html});
    const m=u.match(/three@0\.147\.0\/(.*)$/); if(m) return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(three+m[1])});
    return route.abort();});

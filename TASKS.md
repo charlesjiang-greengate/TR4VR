@@ -14,6 +14,9 @@ Late work is dropped. Ship something small that works rather than something big 
    Do not commit `jade-labyrinth.html` changes (the integrator rebuilds).
 3. No external requests at runtime except relative `assets/...` URLs (CSP blocks everything else). Only CC0 / clearly
    licensed assets; list sources in a comment at the top of your file. Keep your assets ≤ 8 MB.
+3b. The artifact host only serves .js/.json/.txt/.jpg/.png/.webp/.svg/.mp3/.mp4/.woff2/.wasm. Reference binaries as quoted
+   string literals ending in `.glb` / `.hdr` / `.bin` (e.g. `'assets/veg/tree.glb'`); `build.js` rewrites them to `*.glb.wasm` and the
+   integrator publishes them under that name. Other extensions will 404 in production.
 4. Wrap everything in try/catch-safe code: a failed asset load must leave the game working.
 5. Must run at 60 fps on a mid laptop GPU: instance/merge geometry, no per-frame allocations.
 
