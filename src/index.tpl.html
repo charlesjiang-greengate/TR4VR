@@ -1,0 +1,118 @@
+<title>Jade Labyrinth</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Barlow+Condensed:wght@400;500;600&display=swap">
+<style>
+/* Layout: one full-bleed WebGL stage; lacquer-and-jade HUD pinned to the corners, title card set low-left like a film poster. */
+:root{
+  color-scheme:dark;
+  --ink:#07090a; --paper:#f3e9d6; --paper-dim:rgba(243,233,214,.68);
+  --vermilion:#c8321c; --jade:#4fe0a0; --gold:#e8b65a; --veil:rgba(7,9,10,.55);
+  --display:'Marcellus','Songti SC','Noto Serif CJK SC','Times New Roman',serif;
+  --ui:'Barlow Condensed','Avenir Next Condensed','Arial Narrow',sans-serif;
+}
+html,body{height:100%;}
+body{background:var(--ink);color:var(--paper);font-family:var(--ui);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none;}
+#stage{position:fixed;inset:0;background:var(--ink);}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;}
+.pad{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));}
+
+#title{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:14px;padding-block:calc(28px + env(safe-area-inset-top,0px)) calc(36px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(180deg,rgba(7,9,10,0) 35%,rgba(7,9,10,.82) 100%);transition:opacity 1.2s ease,visibility 1.2s;}
+#title.off{opacity:0;visibility:hidden;pointer-events:none;}
+#title .inner{max-width:560px;display:flex;flex-direction:column;gap:14px;margin-left:clamp(0px,5vw,64px);}
+.han{font-family:var(--display);font-size:clamp(18px,2.4vw,24px);letter-spacing:.5em;color:var(--gold);}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(44px,8vw,92px);line-height:.95;margin:0;letter-spacing:.02em;text-wrap:balance;text-shadow:0 2px 30px rgba(0,0,0,.6);}
+.lede{font-size:clamp(16px,1.6vw,19px);line-height:1.45;color:var(--paper-dim);max-width:46ch;margin:0;letter-spacing:.02em;}
+.keys{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--paper-dim);margin:0;padding:0;list-style:none;}
+.keys b{color:var(--paper);font-weight:600;}
+button{font:inherit;color:inherit;cursor:pointer;}
+.go{align-self:flex-start;margin-top:6px;background:var(--vermilion);border:1px solid rgba(255,220,170,.35);color:#fff3e2;padding:13px 30px 12px;font-size:17px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;border-radius:2px;box-shadow:0 8px 30px rgba(200,50,28,.35);transition:transform .15s,background .15s;}
+.go:hover{background:#dd3d24;transform:translateY(-1px);}
+.go:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
+
+#hud{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity 1s .4s;}
+#hud.on{opacity:1;}
+.tl{position:absolute;left:0;top:calc(16px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;gap:8px;}
+.label{font-size:12px;letter-spacing:.3em;text-transform:uppercase;color:var(--gold);}
+#obj{font-family:var(--display);font-size:clamp(16px,2vw,21px);text-shadow:0 1px 10px #000;}
+.hp{width:min(190px,40vw);height:5px;background:rgba(243,233,214,.16);overflow:hidden;}
+#hpbar{height:100%;width:100%;background:linear-gradient(90deg,var(--vermilion),#f06a3c);transform-origin:left;transition:transform .25s;}
+.tr{position:absolute;right:0;top:calc(16px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+#seals{display:flex;gap:9px;}
+#seals i{width:20px;height:20px;border:1.5px solid rgba(243,233,214,.5);transform:rotate(45deg);transition:all .5s;}
+#seals i.on{background:var(--jade);border-color:#c9ffe6;box-shadow:0 0 18px var(--jade);}
+#msg{position:absolute;left:50%;top:22%;transform:translate(-50%,8px);max-width:min(80vw,620px);text-align:center;font-family:var(--display);font-size:clamp(18px,2.6vw,27px);letter-spacing:.03em;text-shadow:0 2px 18px #000,0 0 4px #000;opacity:0;transition:opacity .8s,transform .8s;text-wrap:balance;}
+#msg.on{opacity:1;transform:translate(-50%,0);}
+#prompt{position:absolute;left:50%;bottom:calc(17% + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--veil);border:1px solid rgba(232,182,90,.45);padding:9px 18px 8px;font-size:15px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;opacity:0;transition:opacity .25s;backdrop-filter:blur(6px);}
+#prompt.on{opacity:1;}
+
+#end{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:radial-gradient(ellipse at center,rgba(7,9,10,.35),rgba(7,9,10,.88));opacity:0;transition:opacity 2s;}
+#end.on{opacity:1;}
+#end h2{font-family:var(--display);font-weight:400;font-size:clamp(36px,7vw,76px);margin:0;text-wrap:balance;}
+#end p{margin:0;color:var(--paper-dim);font-size:18px;max-width:44ch;line-height:1.45;}
+#end .go{align-self:center;}
+
+#stick,#bJump,#bAct{display:none;}
+.touch #stick{display:block;position:absolute;width:96px;height:96px;margin:-48px 0 0 -48px;border:1.5px solid rgba(243,233,214,.35);border-radius:50%;opacity:0;pointer-events:none;}
+.touch #stick.on{opacity:1;}
+#stick b{position:absolute;left:28px;top:28px;width:40px;height:40px;border-radius:50%;background:rgba(243,233,214,.5);}
+.touch #hud.on .tb{display:flex;pointer-events:auto;position:absolute;align-items:center;justify-content:center;width:68px;height:68px;border-radius:50%;background:var(--veil);border:1.5px solid rgba(243,233,214,.45);font-size:13px;letter-spacing:.14em;text-transform:uppercase;}
+.touch #bJump{right:calc(20px + env(safe-area-inset-right,0px));bottom:calc(34px + env(safe-area-inset-bottom,0px));}
+.touch #bAct{right:calc(100px + env(safe-area-inset-right,0px));bottom:calc(84px + env(safe-area-inset-bottom,0px));border-color:var(--gold);}
+.touch .keys{display:none;}
+@media (prefers-reduced-motion:reduce){#title,#hud,#msg,#end{transition:none;}}
+</style>
+
+<div id="stage">
+  <canvas id="gl" tabindex="0"></canvas>
+
+  <div id="hud" class="pad">
+    <div class="tl pad"><span class="label">Objective</span><span id="obj">Recover the three jade seals</span><div class="hp"><div id="hpbar"></div></div></div>
+    <div class="tr pad"><span class="label">Jade seals</span><div id="seals"><i></i><i></i><i></i></div></div>
+    <div id="msg"></div>
+    <div id="prompt"></div>
+    <div id="stick"><b></b></div>
+    <button id="bAct" class="tb" type="button">Use</button>
+    <button id="bJump" class="tb" type="button">Jump</button>
+  </div>
+
+  <div id="title" class="pad">
+    <div class="inner">
+      <div class="han">翡翠迷宮</div>
+      <h1>Jade Labyrinth</h1>
+      <p class="lede">Dusk over the Wuling ranges. Explorer Mei Lin steps under the first vermilion gate of a temple maze that no map admits to. Three jade seals open the way to the dragon.</p>
+      <ul class="keys"><li><b>WASD</b> move</li><li><b>Mouse</b> look</li><li><b>Space</b> jump · climb</li><li><b>E</b> use</li><li><b>Shift</b> walk</li></ul>
+      <button id="start" class="go" type="button">Enter the labyrinth</button>
+    </div>
+  </div>
+
+  <div id="end" hidden>
+    <div class="han">龍 歸</div>
+    <h2>The Jade Dragon is yours</h2>
+    <p>Lantern light catches the pearl as the maze falls silent behind you. Mei Lin has what she came for.</p>
+    <button id="again" class="go" type="button">Walk it again</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/Pass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/FXAAShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/objects/Water.js"></script>
+<script>
+/*__HEROINE__*/
+</script>
+<script>
+/*__ARCH__*/
+</script>
+<script>
+/*__NATURE__*/
+</script>
+<script>
+/*__GFX__*/
+</script>
+<script>
+/*__GAME__*/
+</script>
