@@ -228,7 +228,7 @@ window.createHeroine2 = function (THREE) {
     o[0] = vT.x * L.side; o[1] = vT.y; o[2] = vT.z;
     vB.subVectors(vC, vA).normalize(); vT.setFromMatrixColumn(L.up.matrixWorld, 2).normalize().cross(vB).applyQuaternion(qGi);   // bend-plane direction (exact even for a straight limb)
     o[3] = vT.x * L.side; o[4] = vT.y; o[5] = vT.z;
-    if (L.leg) { vT.setFromMatrixPosition(L.tip.matrixWorld).sub(vC).applyQuaternion(qGi); o[6] = Math.atan2(-vT.y, Math.hypot(vT.x, vT.z)) - I.toeRest; } else o[6] = 0;
+    if (L.leg) { vT.setFromMatrixPosition(L.tip.matrixWorld).sub(vC).applyQuaternion(qGi); o[6] = Math.atan2(-vT.y, vT.z) - I.toeRest; if (o[6] < -1.6) o[6] += 2 * Math.PI; } else o[6] = 0;
   }
   function mkLimb(I, up, lo, end, tip, side, leg) {
     return { up: up, lo: lo, end: end, tip: tip, side: side, leg: leg, l1: lo.position.length() * I.scale, l2: end.position.length() * I.scale, cur: new Float32Array(7), tmp: new Float32Array(7) };
@@ -250,7 +250,7 @@ window.createHeroine2 = function (THREE) {
     var lf = P(B[b + 'L_Foot']), rf = P(B[b + 'R_Foot']), sh = P(B[b + 'L_UpperArm']), toe = P(B[b + 'L_Toe0']).sub(lf);
     I.legLen = I.limbs[0].l1 + I.limbs[0].l2; I.armLen = I.limbs[2].l1 + I.limbs[2].l2; I.k = I.legLen / 0.9;
     I.hipY = P(B[b + 'L_Thigh']).y; I.ankleH = Math.min(lf.y, rf.y); I.shY = sh.y; I.shZ = sh.z; I.shX = Math.abs(sh.x);
-    I.stance = [lf, rf]; I.toeRest = Math.atan2(-toe.y, Math.hypot(toe.x, toe.z));
+    I.stance = [lf, rf]; I.toeRest = Math.atan2(-toe.y, toe.z);
     // flat-footed world orientation of each foot, taken from the bind pose
     I.footRef = [new THREE.Quaternion().copy(I.bindQ[0]), new THREE.Quaternion().copy(I.bindQ[1])];
   }
@@ -380,7 +380,7 @@ window.createHeroine2 = function (THREE) {
       // hips: hang under the hands, hold at ledge level while the arms press (support), crouch over the planted foot, stand up.
       // The capsule rises faster than a body can, so the visual pelvis is held back (never above where standing would put it).
       var hipS = I.hipY + cy - c.h, c0 = A.handUse ? 0.0 : 0.62 * legLen, c1 = A.handUse ? 0.5 * legLen : 0.62 * legLen;
-      var cap = c0 + (c1 - c0) * sm(0.3, 0.6, t) + (I.hipY + 0.3 * K - c1) * sm(0.6, 0.98, t);
+      var cap = c0 + (c1 - c0) * sm(0.33, 0.62, t) + (I.hipY + 0.3 * K - c1) * sm(0.6, 0.98, t);
       pvY = (smin(hipS, cap, 0.12 * K) - hipS) * gIn;
       // catch: if the edge is out of reach, hop up to it (visual only), settling as the capsule rises
       var hz = c.d - pvZ - I.shZ, vr = 0.97 * armLen, need = (c.h - cy + 0.03 * K) - (I.shY + pvY + Math.sqrt(Math.max(0.01, vr * vr - hz * hz)));
@@ -432,10 +432,10 @@ window.createHeroine2 = function (THREE) {
             pitch = mixf(pitch, 0, w4);
           }
         } else if (inClimb) {                   // hands: pinned to the ledge edge while it is within reach
-          var hi = i - 2, press = sm(-0.1 * K, 0.25 * K, shRel), rel = hi === 1 ? 0.34 : 0.37;
+          var hi = i - 2, press = sm(-0.1 * K, 0.25 * K, shRel), rel = hi === 1 ? 0.38 : 0.41;
           cPoint(vA, (I.shX + 0.03 * K) * L.side, c.h + 0.028 * K, (hi === 0 ? c.dl : c.dr) + mixf(-0.025, 0.07, press) * K);
           var stretch = vA.distanceTo(vR) - 0.985 * len;
-          var pw = sm(0.0, 0.17, t) * (1 - sm(rel, rel + 0.16, t)) * (1 - sm(0.0, 0.3 * len, stretch)) * A.handUse;
+          var pw = sm(0.0, 0.17, t) * (1 - sm(rel, rel + 0.14, t)) * (1 - sm(0.0, 0.3 * len, stretch)) * A.handUse;
           var app = 1 - sm(0.0, 0.17, t); vA.y += 0.1 * K * app; vA.addScaledVector(vF.set(c.dx, 0, c.dz), -0.08 * K * app);   // arrive from above / outside the lip
           A.plant[hi] = plantW = pw;
           vTg.lerp(vA, plantW);
