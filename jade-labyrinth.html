@@ -26,6 +26,12 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(44px,8vw,92px);lin
 .keys{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--paper-dim);margin:0;padding:0;list-style:none;}
 .keys b{color:var(--paper);font-weight:600;}
 button{font:inherit;color:inherit;cursor:pointer;}
+#who{display:flex;flex-wrap:wrap;gap:10px;}
+#who button{display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-width:150px;padding:10px 16px 9px;background:var(--veil);border:1px solid rgba(243,233,214,.28);border-radius:2px;text-align:left;backdrop-filter:blur(6px);transition:border-color .2s,background .2s;}
+#who button b{font-family:var(--display);font-weight:400;font-size:19px;}
+#who button span{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);}
+#who button.on{border-color:var(--jade);background:rgba(20,60,44,.6);box-shadow:0 0 0 1px var(--jade) inset;}
+#who button:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
 .go{align-self:flex-start;margin-top:6px;background:var(--vermilion);border:1px solid rgba(255,220,170,.35);color:#fff3e2;padding:13px 30px 12px;font-size:17px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;border-radius:2px;box-shadow:0 8px 30px rgba(200,50,28,.35);transition:transform .15s,background .15s;}
 .go:hover{background:#dd3d24;transform:translateY(-1px);}
 .go:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
@@ -80,7 +86,8 @@ button{font:inherit;color:inherit;cursor:pointer;}
     <div class="inner">
       <div class="han">翡翠迷宮</div>
       <h1>Jade Labyrinth</h1>
-      <p class="lede">Dusk over the Wuling ranges. Explorer Mei Lin steps under the first vermilion gate of a temple maze that no map admits to. Three jade seals open the way to the dragon.</p>
+      <p class="lede">Dusk over the Wuling ranges. Two sisters stand under the first vermilion gate of a temple maze that no map admits to. Three jade seals open the way to the dragon. Choose who goes in.</p>
+      <div id="who" role="radiogroup" aria-label="Choose your explorer"><button type="button" role="radio" data-v="elder" aria-checked="true"><b>Elder sister</b><span>Taller · white No. 98 jersey</span></button><button type="button" role="radio" data-v="younger" aria-checked="false"><b>Younger sister</b><span>Smaller · pink hoodie</span></button></div>
       <ul class="keys"><li><b>WASD</b> move</li><li><b>Mouse</b> look</li><li><b>Space</b> jump · climb</li><li><b>E</b> use</li><li><b>Shift</b> walk</li></ul>
       <button id="start" class="go" type="button">Enter the labyrinth</button>
     </div>
@@ -89,7 +96,7 @@ button{font:inherit;color:inherit;cursor:pointer;}
   <div id="end" hidden>
     <div class="han">龍 歸</div>
     <h2>The Jade Dragon is yours</h2>
-    <p>Lantern light catches the pearl as the maze falls silent behind you. Mei Lin has what she came for.</p>
+    <p>Lantern light catches the pearl as the maze falls silent behind you. She has what she came for.</p>
     <button id="again" class="go" type="button">Walk it again</button>
   </div>
 </div>
@@ -548,6 +555,20 @@ button{font:inherit;color:inherit;cursor:pointer;}
       }
       return { X: X, Y: Y, Z: Z, NZ: NZ, C: C, S: S };
     }
+    function slimLegs(geo) {
+      var P = geo.attributes.position, hip = bones.LeftUpLeg.getWorldPosition(V3()), knee = bones.LeftLeg.getWorldPosition(V3()), ank = bones.LeftFoot.getWorldPosition(V3());
+      var top = hip.y - 0.06;
+      for (var i = 0; i < P.count; i++) {
+        var y = P.getY(i); if (y < 0.09 || y > top) continue;
+        var x = P.getX(i), z = P.getZ(i), sgn = x >= 0 ? 1 : -1, t, cxl, czl, target;
+        if (y > knee.y) { t = (y - knee.y) / (hip.y - knee.y); cxl = knee.x + (hip.x - knee.x) * t; czl = knee.z + (hip.z - knee.z) * t; target = 0.064 + 0.03 * Math.min(1, t); }
+        else { t = clamp01((y - ank.y) / (knee.y - ank.y)); cxl = ank.x + (knee.x - ank.x) * t; czl = ank.z + (knee.z - ank.z) * t; target = 0.047 + 0.017 * t; }
+        cxl *= sgn; var dx = x - cxl, dz = z - czl, r = Math.sqrt(dx * dx + dz * dz); if (r <= target) continue;
+        var f = (target + (r - target) * 0.22) / r, bl = sm(top, top - 0.14, y) * sm(0.09, 0.15, y); f = 1 + (f - 1) * bl;
+        P.setXYZ(i, cxl + dx * f, y, czl + dz * f);
+      }
+      P.needsUpdate = true;
+    }
     function paint(vn) {
       var S = 1024; if (!baked) baked = bake(mesh.geometry, S);
       var cv = document.createElement('canvas'); cv.width = cv.height = S; var cx = cv.getContext('2d');
@@ -572,7 +593,7 @@ button{font:inherit;color:inherit;cursor:pointer;}
           var x = X[k], y = Y[k], ax = Math.abs(x), front = NZ[k] > 0.1;
           var col = null, nz = ((k * 2654435761) >>> 24) / 255 - 0.5;
           if (elder) {
-            var torso = ax < 0.215 && y > 0.86 && y <= 1.405, sleeve = ax >= 0.215 && ax < 0.37 && y > 1.15;
+            var torso = ax < 0.215 && y > 0.86 && y <= 1.405, sleeve = ax >= 0.215 && ax < 0.37 && y > 1.15 && y < 1.45;
             if (torso || sleeve) {
               var yV = front ? 1.385 - Math.max(0, 0.075 - ax) * 1.25 : 1.39;
               if (ax < 0.13 && y > yV) { if (!isSkin) { lum = 0.36; skinOut(0.97); } }
@@ -590,7 +611,7 @@ button{font:inherit;color:inherit;cursor:pointer;}
               else col = y < 0.03 ? [34, 28, 24] : [104, 66, 40];
             }
           } else {
-            var hood = (ax < 0.215 && y > 0.84 && y <= 1.415) || (ax >= 0.215 && ax < 0.645 && y > 1.12);
+            var hood = (ax < 0.215 && y > 0.84 && y <= 1.415) || (ax >= 0.215 && ax < 0.645 && y > 1.12 && y < 1.45);
             if (hood) {
               col = [246, 198, 208];
               if (y < 0.87 || ax > 0.615) col = [232, 178, 190];
@@ -604,9 +625,11 @@ button{font:inherit;color:inherit;cursor:pointer;}
             }
           }
           if (col) { R = col[0] * sh; G = col[1] * sh; B = col[2] * sh; set = true; }
+          if (!set && y > 1.41 && ax < 0.3 && (hue < 50 || hue > 338) && sat > 0.72 && val > 0.45) { R = 30 * sh + 14; G = 30 * sh + 14; B = 36 * sh + 16; set = true; }
           // hair stays black: desaturate any brownish dark hair on the head
           if (!set && y > 1.40 && ax < 0.3 && lum < 0.22) { R = G = B = lum * 150; set = true; }
         }
+        if (!set && !C[k] && (hue < 50 || hue > 338) && sat > 0.72 && val > 0.45) { R = 30 * sh + 14; G = 30 * sh + 14; B = 36 * sh + 16; set = true; }
         if (set) { d[o] = Math.min(255, R); d[o + 1] = Math.min(255, G); d[o + 2] = Math.min(255, B); }
       }
       cx.putImageData(id, 0, 0);
@@ -626,10 +649,11 @@ button{font:inherit;color:inherit;cursor:pointer;}
       mesh.material = mat;
       mesh.geometry.computeBoundingBox(); modelH = mesh.geometry.boundingBox.max.y - Math.min(0, mesh.geometry.boundingBox.min.y); if (!(modelH > 0.5 && modelH < 3)) modelH = 1.66;
       root.updateMatrixWorld(true);
+      try { slimLegs(mesh.geometry); } catch (e) { console.warn(e); }
       ORDER.forEach(function (n) { var b = bones[n], c = bones[CHILD[n]]; if (!b || !c) return; restQ[n] = b.getWorldQuaternion(Q()); restDir[n] = c.getWorldPosition(V3()).sub(b.getWorldPosition(V3())).normalize(); });
       // retarget clips from the animation rig (same Mixamo skeleton) by bone name
       var sroot = a.scene; sroot.updateMatrixWorld(true);
-      var sH = null; sroot.traverse(function (o) { if (o.isBone && /Hips$/.test(o.name)) sH = sH || o; });
+      var sH = null, sB = {}; sroot.traverse(function (o) { if (o.isBone) { sB[o.name.replace('mixamorig', '')] = o; if (/Hips$/.test(o.name)) sH = sH || o; } });
       var tH = bones.Hips, Cq = tH.parent.getWorldQuaternion(Q()).invert().multiply(sH.parent.getWorldQuaternion(Q()));
       var Ms = sH.parent.matrixWorld.clone(), MtInv = tH.parent.matrixWorld.clone().invert();
       var ratio = tH.getWorldPosition(V3()).y / sH.getWorldPosition(V3()).y;
@@ -640,7 +664,9 @@ button{font:inherit;color:inherit;cursor:pointer;}
           if (!b) return;
           if (prop === 'quaternion') {
             vals = Float32Array.from(t.values);
-            if (key === 'Hips') for (i = 0; i < vals.length; i += 4) { q1.fromArray(vals, i).premultiply(Cq).toArray(vals, i); }
+            var sb = sB[key]; if (!sb) return;
+            var A = b.parent.getWorldQuaternion(Q()).invert().multiply(sb.parent.getWorldQuaternion(Q())), Bq = sb.getWorldQuaternion(Q()).invert().multiply(b.getWorldQuaternion(Q()));
+            for (i = 0; i < vals.length; i += 4) { q1.fromArray(vals, i).premultiply(A).multiply(Bq).toArray(vals, i); }
             tracks.push(new THREE.QuaternionKeyframeTrack(b.name + '.quaternion', t.times, vals));
           } else if (prop === 'position' && key === 'Hips') {
             vals = Float32Array.from(t.values);
@@ -2212,13 +2238,13 @@ window.JL = {};
       float maxD=min(dist,64.);
       float ds=maxD/uSteps;
       float cosT=dot(rd,uSunDir); float g=0.62;
-      float phase=(1.-g*g)/pow(1.+g*g-2.*g*cosT,1.5)*0.25+0.12;
+      float phase=(1.-g*g)/pow(1.+g*g-2.*g*cosT,1.5)*0.30+0.10;
       vec3 acc=vec3(0.); float Tr=1.;
       float t=ds*noise;
       for(int i=0;i<32;i++){
         if(float(i)>=uSteps) break;
         vec3 p=uCam+rd*t;
-        float dens=(0.010+0.060*exp(-max(p.y,0.)*0.30))*uFogAmt;
+        float dens=(0.0035+0.016*exp(-max(p.y,0.)*0.28))*uFogAmt;
         dens*=1.+0.55*sin(p.x*0.33+uTime*0.13)*sin(p.z*0.29-uTime*0.09)*sin(p.y*0.7+uTime*0.05);
         float lit=uHasShadow>0.5?shadowAt(p):1.;
         float tr=exp(-dens*ds);
@@ -2226,11 +2252,11 @@ window.JL = {};
         acc+=Tr*(1.-tr)*Lin; Tr*=tr;
         t+=ds;
       }
-      float far=max(dist-64.,0.);
-      float trf=exp(-far*0.0035*uFogAmt);
+      float far=depth<0.9999?clamp(dist-64.,0.,400.):0.;
+      float trf=exp(-far*0.0022*uFogAmt);
       vec3 farCol=uFogCol*1.6+uSunCol*0.10*phase;
       col=col*Tr+acc;
-      col=mix(farCol*(1.-Tr)+col, col, 1.)*trf+farCol*(1.-trf)*Tr;
+      col=col*trf+farCol*(1.-trf)*Tr;
       gl_FragColor=vec4(col,1.);
     }`;
 
@@ -2419,10 +2445,10 @@ window.JL = {};
       if (color !== undefined) m.color.setHex(color);
       m.normalScale.set(ns, ns); if (rough !== undefined) m.roughness = rough; m.needsUpdate = true;
     };
-    set('plaster', 0.5, true, (d, n, r) => put(M.plaster, d, n, r, 0xd9988a, 1.3, 1.0));
+    set('plaster', 0.5, true, (d, n, r) => put(M.plaster, d, n, r, 0xa38c86, 1.3, 1.0));
     set('stone', 1.0, true, (d, n, r) => { put(M.stone, d, n, r, 0xb9b4aa, 1.4, 1.0); put(M.darkStone, d, n, r, 0x6f7377, 1.4, 1.0); put(M.poolFloor, d, n, r, 0x4f6e62, 1.2, 0.9); });
     set('floor', 2 / 3, true, (d, n, r) => put(M.floor, d, n, r, 0xa7a39b, 1.6, 0.9));
-    set('roof', 1 / 3, true, (d, n, r) => { put(M.roofTile, d, n, r, 0x8d949c, 1.5, 0.85); M.roofTile.metalness = 0; });
+    set('roof', 1 / 3, true, (d, n, r) => { put(M.roofTile, d, n, r, 0x8d949c, 1.5, 0.85); if (M.roofTile) M.roofTile.metalness = 0; });
     set('wood', 0.55, true, (d, n, r) => { put(M.wood, d, n, r, 0x8a7360, 1.2, 1.0); put(M.redLacquer, null, n, r, undefined, 0.5, 0.5); });
     set('bark', 1.0, false, (d, n) => put(M.bark, d, n, null, 0x9a8c7c, 1.3, 0.95));
     load('ground_d.jpg', true, 420).then(t => {
@@ -2445,11 +2471,11 @@ window.JL = {};
         if(uHalf>0.5){ float l=dot(c,vec3(0.2126,0.7152,0.0722)); c*=1.+0.7*smoothstep(0.55,1.,l); }
         c=min(c*uGain,vec3(uClamp));
         float y=max(d.y,0.);
-        c*=mix(vec3(1.22,0.93,0.70),vec3(1.02,0.98,0.93),smoothstep(0.,0.55,y));
+        c*=mix(vec3(1.28,0.95,0.70),vec3(1.08,1.0,0.90),smoothstep(0.,0.55,y));
         float s=max(dot(d,sunDir),0.);
         c+=vec3(1.0,0.55,0.25)*pow(s,6.)*0.30;
         c+=uSun*vec3(1.0,0.8,0.55)*(pow(s,900.)*40.+pow(s,60.)*0.9);
-        if(d.y<0.) c=mix(c,vec3(0.10,0.12,0.12),smoothstep(0.,-0.12,d.y));
+        if(d.y<0.) c=mix(c,vec3(0.10,0.12,0.12),smoothstep(0.,-0.05,d.y));
         gl_FragColor=vec4(c,1.);
       }`;
     const skyMat = (tex, half, gain, clampV, sunAmt) => new T.ShaderMaterial({
@@ -2480,6 +2506,7 @@ window.JL = {};
 
 </script>
 <script>
+
 (function (JL) {
   'use strict';
   const T = THREE;
@@ -2513,7 +2540,7 @@ window.JL = {};
   const rnd = JL.rng(2026);
 
   const touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-  const lowQ = touch && Math.min(screen.width, screen.height) < 900;
+  const lowQ = !!window.JL_LOWQ || (touch && Math.min(screen.width, screen.height) < 900);
 
   // ---------- renderer ----------
   const canvas = $('gl');
@@ -2532,6 +2559,10 @@ window.JL = {};
   const nature = window.createNatureProps ? window.createNatureProps(T, M) : {};
   const prop = (lib, name, ...a) => { try { if (lib[name]) return lib[name](...a); } catch (e) { console.warn('prop', name, e); } return new T.Group(); };
   const place = (g, x, y, z, ry, s) => { g.position.set(x, y, z); if (ry) g.rotation.y = ry; if (s) g.scale.setScalar(s); scene.add(g); return g; };
+  // ---- extension context (see TASKS.md): src/ext_*.js files register JL.extPre / JL.ext callbacks ----
+  const extUpd = [], backdrop = new T.Group(); scene.add(backdrop);
+  const ctx = JL.ctx = { THREE: T, JL, scene, camera, renderer, M, arch, nature, prop, place, MAP, CELL, WALL_H, COLS, ROWS, cx, cz, at, rng: JL.rng, lowQ, backdrop, onUpdate: f => extUpd.push(f) };
+  (JL.extPre || []).forEach(f => { try { f(ctx); } catch (e) { console.warn('extPre', e); } });
 
   // ---------- sky / sun / environment ----------
   const sunDir = new T.Vector3(-0.50, 0.80, -0.42).normalize();
@@ -2673,7 +2704,7 @@ window.JL = {};
       for (let i = 0; i <= seg; i++) { const a = i / seg * Math.PI * 2, hh = (hs[i % seg] + hs[(i + 1) % seg] + hs[(i + seg - 1) % seg]) / 3; p.push(Math.cos(a) * R, -2, Math.sin(a) * R, Math.cos(a) * R * 0.97, hh, Math.sin(a) * R * 0.97); }
       for (let i = 0; i < seg; i++) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
       const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(p, 3)); geo.setIndex(idx);
-      const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color, side: T.DoubleSide })); m.position.copy(center); scene.add(m);
+      const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color, side: T.DoubleSide })); m.position.copy(center); backdrop.add(m);
     };
     ring(170, 28, 62, 0x0e1a1c, 3); ring(250, 55, 120, 0x152a33, 4); ring(340, 90, 190, 0x1f3f4f, 5);
   }
@@ -2710,8 +2741,8 @@ window.JL = {};
   }
   place(prop(nature, 'cherryTree', 6.5, 3), 21.3, 0, 21.3); col(21.0, 0, 21.0, 21.6, 3, 21.6);
   place(prop(nature, 'cherryTree', 6, 8), 46.7, 0, 46.7); col(46.4, 0, 46.4, 47.0, 3, 47.0);
-  place(prop(nature, 'pine', 4.5, 5), 46.6, 0, 21.4); col(46.3, 0, 21.1, 46.9, 3, 21.7);
-  place(prop(nature, 'pine', 4, 6), 21.4, 0, 46.6); col(21.1, 0, 46.3, 21.7, 3, 46.9);
+  place(prop(nature, 'bambooCluster', 11, 0.9, 8, 5), 46.4, 0, 21.6); col(45.7, 0, 20.9, 47.1, 3, 22.3); place(prop(nature, 'rock', 0.8, 9), 45.3, 0, 22.4);
+  place(prop(nature, 'bambooCluster', 11, 0.9, 7.5, 6), 21.6, 0, 46.4); col(20.9, 0, 45.7, 22.3, 3, 47.1); place(prop(nature, 'rock', 0.7, 11), 22.7, 0, 45.4);
   [[29.3, 21.3], [38.7, 21.3]].forEach(p => { place(prop(nature, 'guardianLion'), p[0], 0, p[1]); col(p[0] - 0.65, 0, p[1] - 0.65, p[0] + 0.65, 2.3, p[1] + 0.65); });
   const brazierAt = (x, z) => { const b = prop(arch, 'brazier'); place(b, x, 0, z); col(x - 0.4, 0, z - 0.4, x + 0.4, 1.1, z + 0.4); const fp = b.userData.firePos ? b.userData.firePos.clone() : new T.Vector3(0, 1.05, 0); fp.add(b.position); flames.push(fp); addLight(x, fp.y + 0.5, z, 0xff6a20, 26); moteList.push({ pos: fp, radius: 0.18, h: 1.2, n: 14, color: [3.0, 1.1, 0.2], size: 0.035, rise: 1 }); };
   brazierAt(31.0, 20.9); brazierAt(37.0, 20.9); brazierAt(25.2, 5.2); brazierAt(42.8, 5.2); brazierAt(25.2, 14.8); brazierAt(42.8, 14.8);
@@ -2730,7 +2761,7 @@ window.JL = {};
     const x = cx(t[0]), z = cz(t[1]);
     if (t[2] === 'b') place(prop(nature, 'bambooCluster', 8, 1.2, 6 + rnd() * 3, i + 10), x, WALL_H - 0.05, z);
     else if (t[2] === 'c') place(prop(nature, 'cherryTree', 4.5 + rnd() * 1.5, i + 20), x, WALL_H - 0.05, z, rnd() * 6);
-    else place(prop(nature, 'pine', 4, i + 30), x, WALL_H - 0.05, z);
+    else place(prop(nature, 'bambooCluster', 8, 1.2, 7, i + 30), x, WALL_H - 0.05, z);
   });
   for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + 0.2, R = 50 + rnd() * 12; place(prop(nature, 'bambooCluster', 9, 2, 11 + rnd() * 4, i + 50), center.x + Math.cos(a) * R * 0.95, 0, center.z + Math.sin(a) * R * 1.05); }
   place(prop(arch, 'pagoda', 4, 9), 34, 0, -16); place(prop(arch, 'pagoda', 3, 6), -14, 0, 20, 0.5); place(prop(arch, 'pagoda', 3, 6), 82, 0, 30, 0.3);
@@ -2743,7 +2774,7 @@ window.JL = {};
   // ---------- ground cover: grass tufts along wall bases, fallen petals ----------
   {
     const cv = document.createElement('canvas'); cv.width = cv.height = 128; const g = cv.getContext('2d'); const rr = JL.rng(404);
-    for (let i = 0; i < 46; i++) { const x = 8 + rr() * 112, h = 40 + rr() * 80, lean = (rr() - 0.5) * 40; const gr = g.createLinearGradient(0, 128, 0, 128 - h); gr.addColorStop(0, 'rgb(' + (30 + rr() * 20 | 0) + ',' + (48 + rr() * 30 | 0) + ',14)'); gr.addColorStop(1, 'rgb(' + (90 + rr() * 60 | 0) + ',' + (120 + rr() * 50 | 0) + ',40)'); g.strokeStyle = gr; g.lineWidth = 1.5 + rr() * 2.5; g.lineCap = 'round'; g.beginPath(); g.moveTo(x, 128); g.quadraticCurveTo(x + lean * 0.2, 128 - h * 0.6, x + lean, 128 - h); g.stroke(); }
+    for (let i = 0; i < 46; i++) { const x = 8 + rr() * 112, h = 40 + rr() * 80, lean = (rr() - 0.5) * 40; const gr = g.createLinearGradient(0, 128, 0, 128 - h); gr.addColorStop(0, 'rgb(' + (70 + rr() * 30 | 0) + ',' + (100 + rr() * 30 | 0) + ',40)'); gr.addColorStop(1, 'rgb(' + (150 + rr() * 60 | 0) + ',' + (185 + rr() * 50 | 0) + ',80)'); g.strokeStyle = gr; g.lineWidth = 1.5 + rr() * 2.5; g.lineCap = 'round'; g.beginPath(); g.moveTo(x, 128); g.quadraticCurveTo(x + lean * 0.2, 128 - h * 0.6, x + lean, 128 - h); g.stroke(); }
     const tx = new T.CanvasTexture(cv); tx.encoding = T.sRGBEncoding;
     const gb = new GB(); for (let k = 0; k < 3; k++) { const a = k * Math.PI / 3, dx = Math.cos(a) * 0.28, dz = Math.sin(a) * 0.28; gb.quad([-dx, 0, -dz], [dx, 0, dz], [dx, 0.42, dz], [-dx, 0.42, -dz], [0, 1, 0], [0, 0, 1, 0, 1, 1, 0, 1]); }
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(gb.p, 3)); geo.setAttribute('normal', new T.Float32BufferAttribute(gb.n, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(gb.u, 2)); geo.setIndex(gb.i);
@@ -2756,7 +2787,7 @@ window.JL = {};
         for (let i = 0; i < n; i++) { const t = rr() * CELL, o = 0.14 + rr() * rr() * 0.5; spots.push(d[0] ? [d[0] > 0 ? x0 + CELL + o : x0 - o, z0 + t] : [x0 + t, d[1] > 0 ? z0 + CELL + o : z0 - o]); } });
     }
     const im = new T.InstancedMesh(geo, mat, spots.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), cc = new T.Color();
-    spots.forEach((s, i) => { const sc = 0.6 + rr() * 1.1; e.set(0, rr() * 6.28, 0); q.setFromEuler(e); m4.compose(new T.Vector3(s[0], -0.01, s[1]), q, new T.Vector3(sc, sc * (0.7 + rr() * 0.7), sc)); im.setMatrixAt(i, m4); cc.setHSL(0.22 + rr() * 0.08, 0.5, 0.35 + rr() * 0.25); im.setColorAt(i, cc); });
+    spots.forEach((s, i) => { const sc = 0.4 + rr() * 0.7; e.set(0, rr() * 6.28, 0); q.setFromEuler(e); m4.compose(new T.Vector3(s[0], -0.01, s[1]), q, new T.Vector3(sc, sc * (0.7 + rr() * 0.7), sc)); im.setMatrixAt(i, m4); cc.setHSL(0.20 + rr() * 0.09, 0.45, 0.5 + rr() * 0.3); im.setColorAt(i, cc); });
     im.receiveShadow = true; scene.add(im);
     // fallen petals
     const pg = new T.CircleGeometry(0.04, 5); pg.rotateX(-Math.PI / 2);
@@ -2806,6 +2837,12 @@ window.JL = {};
   // dragon idol
   { const p = prop(nature, 'pedestal'); place(p, 34, 0, 9.5, 0, 1.3); col(33.35, 0, 8.85, 34.65, 1.3, 10.15); }
   const idol = prop(nature, 'dragonIdol'); place(idol, 34, 1.3, 9.5); addLight(34, 3.4, 10.5, 0xffc060, 30);
+  { const g = new GB(); [[-2.2, -2.2], [2.2, -2.2], [-2.2, 2.2], [2.2, 2.2]].forEach(o => { g.box(34 + o[0] - 0.2, 0, 9.5 + o[1] - 0.2, 34 + o[0] + 0.2, 3.9, 9.5 + o[1] + 0.2, 1); col(34 + o[0] - 0.2, 0, 9.5 + o[1] - 0.2, 34 + o[0] + 0.2, 3.9, 9.5 + o[1] + 0.2); }); g.mesh(M.redLacquer);
+    place(prop(arch, 'pavilionRoof', 4.4, 4.4, 2.4), 34, 3.9, 9.5);
+    [[29.6, 12.2], [38.4, 12.2]].forEach(p => { place(prop(nature, 'guardianLion'), p[0], 0, p[1]); col(p[0] - 0.65, 0, p[1] - 0.65, p[0] + 0.65, 2.3, p[1] + 0.65); });
+    const sl = prop(arch, 'stoneLantern'); [[31.2, 15.2], [36.8, 15.2], [26.2, 9.5], [41.8, 9.5]].forEach((p, i) => { place(i ? sl.clone() : sl, p[0], 0, p[1]); col(p[0] - 0.3, 0, p[1] - 0.3, p[0] + 0.3, 1.9, p[1] + 0.3); });
+    const pl2 = prop(arch, 'paperLantern'); [[-1.6, 0], [1.6, 0], [0, 1.6], [0, -1.6]].forEach((o, i) => place(i ? pl2.clone() : pl2, 34 + o[0], 3.75, 9.5 + o[1], 0, 0.7));
+    place(prop(nature, 'cherryTree', 5.5, 41), 26.6, 0, 5.6); place(prop(nature, 'cherryTree', 5, 42), 41.6, 0, 5.4); col(26.3, 0, 5.3, 26.9, 3, 5.9); col(41.3, 0, 5.1, 41.9, 3, 5.7); }
   // blades
   const blades = [[6, 26, 0], [6, 30, 1.3], [6, 34, 2.6]].map(b => { const g = prop(nature, 'blade', 3.3); place(g, b[0], 4.55, b[1]); return { g, x: b[0], z: b[1], ph: b[2] }; });
   // floor spikes
@@ -2820,9 +2857,13 @@ window.JL = {};
 
   // ---------- heroine ----------
   let heroine;
-  try { heroine = window.createHeroine(T); } catch (e) { console.warn('heroine', e); }
+  try { heroine = (window.createHeroine2 || window.createHeroine)(T); } catch (e) { console.warn('heroine', e); }
   if (!heroine) { const g = new T.Group(); const m = new T.Mesh(new T.CapsuleGeometry(0.3, 1.1, 4, 12), M.redLacquer); m.position.y = 0.85; m.castShadow = true; g.add(m); heroine = { group: g, update() { } }; }
   scene.add(heroine.group);
+
+  // ---------- extensions (post-build) ----------
+  Object.assign(ctx, { colliders, col, addLight, lightSpots, GB, sun, sunDir, sky, pl: null, heroine, getWater: () => water, setWater: w => { if (water) scene.remove(water); water = w; if (w) scene.add(w); } });
+  JL.runExt = () => (JL.ext || []).forEach(f => { try { f(ctx); } catch (e) { console.warn('ext', e); } });
 
   // ---------- post ----------
   const post = new JL.Post(renderer, sun, lowQ);
@@ -2993,7 +3034,7 @@ window.JL = {};
   function updateCamera(dt) {
     if (mode === 'title') {
       const t = time * 0.06;
-      camPos.set(34 + Math.sin(t) * 0.7, 1.75 + Math.sin(t * 1.7) * 0.15, 74.3); camTarget.set(34, 2.1, 60);
+      camPos.set(33.0 + Math.sin(t) * 0.35, 1.5 + Math.sin(t * 1.7) * 0.08, 73.5); camTarget.set(33.4, 1.45, 62); pl.yaw = 0.3 + Math.sin(time * 0.25) * 0.12;
       camera.position.copy(camPos); camera.lookAt(camTarget); return;
     }
     camPitch = clamp(camPitch, -0.55, 1.2);
@@ -3039,8 +3080,12 @@ window.JL = {};
     $('bJump').addEventListener('touchstart', e => { e.preventDefault(); jumpQ = true; }, { passive: false });
     $('bAct').addEventListener('touchstart', e => { e.preventDefault(); actQ = true; }, { passive: false });
   }
+  let variant = 'elder'; try { variant = localStorage.getItem('jl-hero') || 'elder'; } catch (e) { }
+  const pick = v => { variant = v; document.querySelectorAll('#who button').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); try { if (heroine.setVariant) heroine.setVariant(v); } catch (e) { console.warn(e); } try { localStorage.setItem('jl-hero', v); } catch (e) { } };
+  document.querySelectorAll('#who button').forEach(b => b.addEventListener('click', () => pick(b.dataset.v)));
+  pick(variant);
   $('start').addEventListener('click', () => {
-    mode = 'play'; $('title').classList.add('off'); $('hud').classList.add('on'); setObjective();
+    mode = 'play'; pl.yaw = Math.PI; $('title').classList.add('off'); $('hud').classList.add('on'); setObjective();
     camTarget.set(pl.pos.x, pl.pos.y + 1.45, pl.pos.z);
     say('Three jade seals guard the Vermilion Gate. Find them.', 6);
     if (!touch && canvas.requestPointerLock) { try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { }); } catch (e) { } }
@@ -3048,6 +3093,7 @@ window.JL = {};
   $('again').addEventListener('click', () => { location.reload(); });
 
   // ---------- loop ----------
+  ctx.pl = pl; ctx.post = post; JL.runExt();
   let last = performance.now(), fAcc = 0, fN = 0;
   const hs = { state: 'idle', speed: 0, vy: 0, climbT: 0, t: 0 };
   function frame(now) {
@@ -3056,6 +3102,7 @@ window.JL = {};
     if (!window.JL_MANUAL) requestAnimationFrame(frame);
     const rdt = (now - last) / 1000; last = now; const dt = Math.min(0.05, rdt); time += dt;
     updatePlayer(dt); updateEntities(dt);
+    for (const f of extUpd) { try { f(dt, time, pl, camera); } catch (e) { if (!f.err) { f.err = 1; console.warn('ext update', e); } } }
     heroine.group.position.copy(pl.pos); heroine.group.rotation.y = pl.yaw;
     heroine.group.visible = !(pl.inv > 0 && pl.dead === 0 && Math.sin(time * 40) > 0.3);
     hs.state = pl.state; hs.speed = Math.hypot(pl.vel.x, pl.vel.z); hs.vy = pl.vel.y; hs.climbT = clamp(pl.climbT, 0, 1); hs.t = time;
@@ -3064,7 +3111,7 @@ window.JL = {};
     petals.material.uniforms.time.value = time; petals.material.uniforms.origin.value.set(camTarget.x, 6, camTarget.z);
     motes.material.uniforms.time.value = time; flameFx.material.uniforms.time.value = time; sky.material.uniforms.time.value = time;
     sky.position.copy(camera.position);
-    if (water) water.material.uniforms.time.value = time * 0.35;
+    if (water && water.material.uniforms && water.material.uniforms.time && !water.userData.ownTime) water.material.uniforms.time.value = time * 0.35;
     hurt = Math.max(0, hurt - dt * 1.6);
     post.final.uniforms.uHurt.value = Math.max(hurt, pl.hp < 40 ? 0.25 + 0.1 * Math.sin(time * 5) : 0);
     post.final.uniforms.uFade.value = fade;
@@ -3091,6 +3138,7 @@ window.JL = {};
     keys.KeyW = keys.KeyS = keys.KeyA = keys.KeyD = false;
     return { x: +pl.pos.x.toFixed(2), y: +pl.pos.y.toFixed(2), z: +pl.pos.z.toFixed(2), g: pl.grounded, st: pl.state, hp: Math.round(pl.hp), dead: pl.dead > 0, seals: sealsGot, gate: gateOpen, cage: cageOpen, mode, t: +time.toFixed(2), steps: i, prompt };
   };
+  JL.debug.water = water; JL.debug.scene = scene; JL.debug.post = post;
   JL.debug.snap = function (n) { let t = performance.now(); for (let i = 0; i < (n || 2); i++) { t += 50; frame(t); } return canvas.toDataURL("image/jpeg", 0.9); };
   requestAnimationFrame(frame);
 })(window.JL);

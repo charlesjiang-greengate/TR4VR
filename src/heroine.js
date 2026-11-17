@@ -441,6 +441,20 @@
       }
       return { X: X, Y: Y, Z: Z, NZ: NZ, C: C, S: S };
     }
+    function slimLegs(geo) {
+      var P = geo.attributes.position, hip = bones.LeftUpLeg.getWorldPosition(V3()), knee = bones.LeftLeg.getWorldPosition(V3()), ank = bones.LeftFoot.getWorldPosition(V3());
+      var top = hip.y - 0.06;
+      for (var i = 0; i < P.count; i++) {
+        var y = P.getY(i); if (y < 0.09 || y > top) continue;
+        var x = P.getX(i), z = P.getZ(i), sgn = x >= 0 ? 1 : -1, t, cxl, czl, target;
+        if (y > knee.y) { t = (y - knee.y) / (hip.y - knee.y); cxl = knee.x + (hip.x - knee.x) * t; czl = knee.z + (hip.z - knee.z) * t; target = 0.064 + 0.03 * Math.min(1, t); }
+        else { t = clamp01((y - ank.y) / (knee.y - ank.y)); cxl = ank.x + (knee.x - ank.x) * t; czl = ank.z + (knee.z - ank.z) * t; target = 0.047 + 0.017 * t; }
+        cxl *= sgn; var dx = x - cxl, dz = z - czl, r = Math.sqrt(dx * dx + dz * dz); if (r <= target) continue;
+        var f = (target + (r - target) * 0.22) / r, bl = sm(top, top - 0.14, y) * sm(0.09, 0.15, y); f = 1 + (f - 1) * bl;
+        P.setXYZ(i, cxl + dx * f, y, czl + dz * f);
+      }
+      P.needsUpdate = true;
+    }
     function paint(vn) {
       var S = 1024; if (!baked) baked = bake(mesh.geometry, S);
       var cv = document.createElement('canvas'); cv.width = cv.height = S; var cx = cv.getContext('2d');
@@ -465,7 +479,7 @@
           var x = X[k], y = Y[k], ax = Math.abs(x), front = NZ[k] > 0.1;
           var col = null, nz = ((k * 2654435761) >>> 24) / 255 - 0.5;
           if (elder) {
-            var torso = ax < 0.215 && y > 0.86 && y <= 1.405, sleeve = ax >= 0.215 && ax < 0.37 && y > 1.15;
+            var torso = ax < 0.215 && y > 0.86 && y <= 1.405, sleeve = ax >= 0.215 && ax < 0.37 && y > 1.15 && y < 1.45;
             if (torso || sleeve) {
               var yV = front ? 1.385 - Math.max(0, 0.075 - ax) * 1.25 : 1.39;
               if (ax < 0.13 && y > yV) { if (!isSkin) { lum = 0.36; skinOut(0.97); } }
@@ -483,7 +497,7 @@
               else col = y < 0.03 ? [34, 28, 24] : [104, 66, 40];
             }
           } else {
-            var hood = (ax < 0.215 && y > 0.84 && y <= 1.415) || (ax >= 0.215 && ax < 0.645 && y > 1.12);
+            var hood = (ax < 0.215 && y > 0.84 && y <= 1.415) || (ax >= 0.215 && ax < 0.645 && y > 1.12 && y < 1.45);
             if (hood) {
               col = [246, 198, 208];
               if (y < 0.87 || ax > 0.615) col = [232, 178, 190];
@@ -497,9 +511,11 @@
             }
           }
           if (col) { R = col[0] * sh; G = col[1] * sh; B = col[2] * sh; set = true; }
+          if (!set && y > 1.41 && ax < 0.3 && (hue < 50 || hue > 338) && sat > 0.72 && val > 0.45) { R = 30 * sh + 14; G = 30 * sh + 14; B = 36 * sh + 16; set = true; }
           // hair stays black: desaturate any brownish dark hair on the head
           if (!set && y > 1.40 && ax < 0.3 && lum < 0.22) { R = G = B = lum * 150; set = true; }
         }
+        if (!set && !C[k] && (hue < 50 || hue > 338) && sat > 0.72 && val > 0.45) { R = 30 * sh + 14; G = 30 * sh + 14; B = 36 * sh + 16; set = true; }
         if (set) { d[o] = Math.min(255, R); d[o + 1] = Math.min(255, G); d[o + 2] = Math.min(255, B); }
       }
       cx.putImageData(id, 0, 0);
@@ -519,10 +535,11 @@
       mesh.material = mat;
       mesh.geometry.computeBoundingBox(); modelH = mesh.geometry.boundingBox.max.y - Math.min(0, mesh.geometry.boundingBox.min.y); if (!(modelH > 0.5 && modelH < 3)) modelH = 1.66;
       root.updateMatrixWorld(true);
+      try { slimLegs(mesh.geometry); } catch (e) { console.warn(e); }
       ORDER.forEach(function (n) { var b = bones[n], c = bones[CHILD[n]]; if (!b || !c) return; restQ[n] = b.getWorldQuaternion(Q()); restDir[n] = c.getWorldPosition(V3()).sub(b.getWorldPosition(V3())).normalize(); });
       // retarget clips from the animation rig (same Mixamo skeleton) by bone name
       var sroot = a.scene; sroot.updateMatrixWorld(true);
-      var sH = null; sroot.traverse(function (o) { if (o.isBone && /Hips$/.test(o.name)) sH = sH || o; });
+      var sH = null, sB = {}; sroot.traverse(function (o) { if (o.isBone) { sB[o.name.replace('mixamorig', '')] = o; if (/Hips$/.test(o.name)) sH = sH || o; } });
       var tH = bones.Hips, Cq = tH.parent.getWorldQuaternion(Q()).invert().multiply(sH.parent.getWorldQuaternion(Q()));
       var Ms = sH.parent.matrixWorld.clone(), MtInv = tH.parent.matrixWorld.clone().invert();
       var ratio = tH.getWorldPosition(V3()).y / sH.getWorldPosition(V3()).y;
@@ -533,7 +550,9 @@
           if (!b) return;
           if (prop === 'quaternion') {
             vals = Float32Array.from(t.values);
-            if (key === 'Hips') for (i = 0; i < vals.length; i += 4) { q1.fromArray(vals, i).premultiply(Cq).toArray(vals, i); }
+            var sb = sB[key]; if (!sb) return;
+            var A = b.parent.getWorldQuaternion(Q()).invert().multiply(sb.parent.getWorldQuaternion(Q())), Bq = sb.getWorldQuaternion(Q()).invert().multiply(b.getWorldQuaternion(Q()));
+            for (i = 0; i < vals.length; i += 4) { q1.fromArray(vals, i).premultiply(A).multiply(Bq).toArray(vals, i); }
             tracks.push(new THREE.QuaternionKeyframeTrack(b.name + '.quaternion', t.times, vals));
           } else if (prop === 'position' && key === 'Hips') {
             vals = Float32Array.from(t.values);

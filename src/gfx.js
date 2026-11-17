@@ -254,13 +254,13 @@ window.JL = {};
       float maxD=min(dist,64.);
       float ds=maxD/uSteps;
       float cosT=dot(rd,uSunDir); float g=0.62;
-      float phase=(1.-g*g)/pow(1.+g*g-2.*g*cosT,1.5)*0.25+0.12;
+      float phase=(1.-g*g)/pow(1.+g*g-2.*g*cosT,1.5)*0.30+0.10;
       vec3 acc=vec3(0.); float Tr=1.;
       float t=ds*noise;
       for(int i=0;i<32;i++){
         if(float(i)>=uSteps) break;
         vec3 p=uCam+rd*t;
-        float dens=(0.010+0.060*exp(-max(p.y,0.)*0.30))*uFogAmt;
+        float dens=(0.0035+0.016*exp(-max(p.y,0.)*0.28))*uFogAmt;
         dens*=1.+0.55*sin(p.x*0.33+uTime*0.13)*sin(p.z*0.29-uTime*0.09)*sin(p.y*0.7+uTime*0.05);
         float lit=uHasShadow>0.5?shadowAt(p):1.;
         float tr=exp(-dens*ds);
@@ -268,11 +268,11 @@ window.JL = {};
         acc+=Tr*(1.-tr)*Lin; Tr*=tr;
         t+=ds;
       }
-      float far=max(dist-64.,0.);
-      float trf=exp(-far*0.0035*uFogAmt);
+      float far=depth<0.9999?clamp(dist-64.,0.,400.):0.;
+      float trf=exp(-far*0.0022*uFogAmt);
       vec3 farCol=uFogCol*1.6+uSunCol*0.10*phase;
       col=col*Tr+acc;
-      col=mix(farCol*(1.-Tr)+col, col, 1.)*trf+farCol*(1.-trf)*Tr;
+      col=col*trf+farCol*(1.-trf)*Tr;
       gl_FragColor=vec4(col,1.);
     }`;
 
@@ -461,10 +461,10 @@ window.JL = {};
       if (color !== undefined) m.color.setHex(color);
       m.normalScale.set(ns, ns); if (rough !== undefined) m.roughness = rough; m.needsUpdate = true;
     };
-    set('plaster', 0.5, true, (d, n, r) => put(M.plaster, d, n, r, 0xd9988a, 1.3, 1.0));
+    set('plaster', 0.5, true, (d, n, r) => put(M.plaster, d, n, r, 0xa38c86, 1.3, 1.0));
     set('stone', 1.0, true, (d, n, r) => { put(M.stone, d, n, r, 0xb9b4aa, 1.4, 1.0); put(M.darkStone, d, n, r, 0x6f7377, 1.4, 1.0); put(M.poolFloor, d, n, r, 0x4f6e62, 1.2, 0.9); });
     set('floor', 2 / 3, true, (d, n, r) => put(M.floor, d, n, r, 0xa7a39b, 1.6, 0.9));
-    set('roof', 1 / 3, true, (d, n, r) => { put(M.roofTile, d, n, r, 0x8d949c, 1.5, 0.85); M.roofTile.metalness = 0; });
+    set('roof', 1 / 3, true, (d, n, r) => { put(M.roofTile, d, n, r, 0x8d949c, 1.5, 0.85); if (M.roofTile) M.roofTile.metalness = 0; });
     set('wood', 0.55, true, (d, n, r) => { put(M.wood, d, n, r, 0x8a7360, 1.2, 1.0); put(M.redLacquer, null, n, r, undefined, 0.5, 0.5); });
     set('bark', 1.0, false, (d, n) => put(M.bark, d, n, null, 0x9a8c7c, 1.3, 0.95));
     load('ground_d.jpg', true, 420).then(t => {
@@ -487,11 +487,11 @@ window.JL = {};
         if(uHalf>0.5){ float l=dot(c,vec3(0.2126,0.7152,0.0722)); c*=1.+0.7*smoothstep(0.55,1.,l); }
         c=min(c*uGain,vec3(uClamp));
         float y=max(d.y,0.);
-        c*=mix(vec3(1.22,0.93,0.70),vec3(1.02,0.98,0.93),smoothstep(0.,0.55,y));
+        c*=mix(vec3(1.28,0.95,0.70),vec3(1.08,1.0,0.90),smoothstep(0.,0.55,y));
         float s=max(dot(d,sunDir),0.);
         c+=vec3(1.0,0.55,0.25)*pow(s,6.)*0.30;
         c+=uSun*vec3(1.0,0.8,0.55)*(pow(s,900.)*40.+pow(s,60.)*0.9);
-        if(d.y<0.) c=mix(c,vec3(0.10,0.12,0.12),smoothstep(0.,-0.12,d.y));
+        if(d.y<0.) c=mix(c,vec3(0.10,0.12,0.12),smoothstep(0.,-0.05,d.y));
         gl_FragColor=vec4(c,1.);
       }`;
     const skyMat = (tex, half, gain, clampV, sunAmt) => new T.ShaderMaterial({

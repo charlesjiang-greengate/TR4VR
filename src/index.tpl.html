@@ -26,6 +26,12 @@ h1{font-family:var(--display);font-weight:400;font-size:clamp(44px,8vw,92px);lin
 .keys{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;letter-spacing:.12em;text-transform:uppercase;color:var(--paper-dim);margin:0;padding:0;list-style:none;}
 .keys b{color:var(--paper);font-weight:600;}
 button{font:inherit;color:inherit;cursor:pointer;}
+#who{display:flex;flex-wrap:wrap;gap:10px;}
+#who button{display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-width:150px;padding:10px 16px 9px;background:var(--veil);border:1px solid rgba(243,233,214,.28);border-radius:2px;text-align:left;backdrop-filter:blur(6px);transition:border-color .2s,background .2s;}
+#who button b{font-family:var(--display);font-weight:400;font-size:19px;}
+#who button span{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);}
+#who button.on{border-color:var(--jade);background:rgba(20,60,44,.6);box-shadow:0 0 0 1px var(--jade) inset;}
+#who button:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
 .go{align-self:flex-start;margin-top:6px;background:var(--vermilion);border:1px solid rgba(255,220,170,.35);color:#fff3e2;padding:13px 30px 12px;font-size:17px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;border-radius:2px;box-shadow:0 8px 30px rgba(200,50,28,.35);transition:transform .15s,background .15s;}
 .go:hover{background:#dd3d24;transform:translateY(-1px);}
 .go:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
@@ -80,7 +86,8 @@ button{font:inherit;color:inherit;cursor:pointer;}
     <div class="inner">
       <div class="han">翡翠迷宮</div>
       <h1>Jade Labyrinth</h1>
-      <p class="lede">Dusk over the Wuling ranges. Explorer Mei Lin steps under the first vermilion gate of a temple maze that no map admits to. Three jade seals open the way to the dragon.</p>
+      <p class="lede">Dusk over the Wuling ranges. Two sisters stand under the first vermilion gate of a temple maze that no map admits to. Three jade seals open the way to the dragon. Choose who goes in.</p>
+      <div id="who" role="radiogroup" aria-label="Choose your explorer"><button type="button" role="radio" data-v="elder" aria-checked="true"><b>Elder sister</b><span>Taller · white No. 98 jersey</span></button><button type="button" role="radio" data-v="younger" aria-checked="false"><b>Younger sister</b><span>Smaller · pink hoodie</span></button></div>
       <ul class="keys"><li><b>WASD</b> move</li><li><b>Mouse</b> look</li><li><b>Space</b> jump · climb</li><li><b>E</b> use</li><li><b>Shift</b> walk</li></ul>
       <button id="start" class="go" type="button">Enter the labyrinth</button>
     </div>
@@ -89,7 +96,7 @@ button{font:inherit;color:inherit;cursor:pointer;}
   <div id="end" hidden>
     <div class="han">龍 歸</div>
     <h2>The Jade Dragon is yours</h2>
-    <p>Lantern light catches the pearl as the maze falls silent behind you. Mei Lin has what she came for.</p>
+    <p>Lantern light catches the pearl as the maze falls silent behind you. She has what she came for.</p>
     <button id="again" class="go" type="button">Walk it again</button>
   </div>
 </div>
