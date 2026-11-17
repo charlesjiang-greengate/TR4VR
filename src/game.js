@@ -281,14 +281,14 @@
     }
     const im = new T.InstancedMesh(geo, mat, spots.length), m4 = new T.Matrix4(), q = new T.Quaternion(), e = new T.Euler(), cc = new T.Color();
     spots.forEach((s, i) => { const sc = 0.4 + rr() * 0.7; e.set(0, rr() * 6.28, 0); q.setFromEuler(e); m4.compose(new T.Vector3(s[0], -0.01, s[1]), q, new T.Vector3(sc, sc * (0.7 + rr() * 0.7), sc)); im.setMatrixAt(i, m4); cc.setHSL(0.19 + rr() * 0.08, 0.32, 0.34 + rr() * 0.22); im.setColorAt(i, cc); });
-    im.receiveShadow = true; scene.add(im);
+    im.receiveShadow = true; im.frustumCulled = false; scene.add(im);
     // fallen petals
     const pg = new T.CircleGeometry(0.04, 5); pg.rotateX(-Math.PI / 2);
     const pm = new T.MeshStandardMaterial({ color: 0xffc0d2, roughness: 0.8, side: T.DoubleSide });
     const src = [[21.3, 21.3, 4.5, 260], [46.7, 46.7, 4.5, 240], [34, 58, 6, 420], [34, 68, 5, 160], [18, 62, 5, 120], [48, 56, 5, 120]]; let tot = 0; src.forEach(s => tot += s[3]);
     const pim = new T.InstancedMesh(pg, pm, tot); let k = 0;
     src.forEach(s => { for (let i = 0; i < s[3]; i++) { const a = rr() * 6.28, d = Math.sqrt(rr()) * s[2]; const sc = 0.6 + rr() * 0.9; e.set((rr() - 0.5) * 0.3, rr() * 6.28, (rr() - 0.5) * 0.3); q.setFromEuler(e); m4.compose(new T.Vector3(s[0] + Math.cos(a) * d, 0.012 + rr() * 0.01, s[1] + Math.sin(a) * d), q, new T.Vector3(sc, 1, sc * 1.5)); pim.setMatrixAt(k, m4); cc.setHSL(0.94 + rr() * 0.04, 0.8, 0.72 + rr() * 0.15); pim.setColorAt(k++, cc); } });
-    pim.receiveShadow = true; scene.add(pim);
+    pim.receiveShadow = true; pim.frustumCulled = false; scene.add(pim);
   }
 
   // ---------- water ----------

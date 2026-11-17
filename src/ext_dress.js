@@ -92,7 +92,7 @@
         for (let y = 0; y < 256; y++) for (let x = 0; x < 64; x++) {
           const yy = y / 255, edge = Math.sin(Math.PI * (x + 0.5) / 64);
           let a = Math.pow(Math.max(0, 1 - yy / (L[x] * (k === 3 ? 0.9 : 1))), k === 3 ? 0.8 : 1.6) * Math.pow(edge, 0.7) * (0.65 + 0.35 * R());
-          a *= k === 2 ? 0.8 : k === 3 ? 0.45 : 0.62;
+          a *= k === 2 ? 0.9 : k === 3 ? 0.6 : 0.82;
           const q = (y * 256 + k * 64 + x) * 4, n = 0.85 + R() * 0.3;
           d[q] = colr[0] * n; d[q + 1] = colr[1] * n; d[q + 2] = colr[2] * n; d[q + 3] = a * 255;
         }
@@ -261,7 +261,7 @@
     inst(tg, tm, tiles, m => m);
     // leaves
     const lg = new T.PlaneGeometry(1, 1); lg.rotateX(-Math.PI / 2);
-    const li = inst(lg, leafMat, leaves, p => { const s = rr(0.07, 0.13); q1.setFromEuler(e.set(rr(-0.25, 0.25), R() * 6.28, rr(-0.25, 0.25))); return m4.compose(v3.set(p[0], 0.02 + R() * 0.012, p[1]), q1, sc.set(s * rr(0.6, 0.9), 1, s)); },
+    const li = inst(lg, leafMat, leaves, p => { const s = rr(0.09, 0.16); q1.setFromEuler(e.set(rr(-0.25, 0.25), R() * 6.28, rr(-0.25, 0.25))); return m4.compose(v3.set(p[0], 0.02 + R() * 0.012, p[1]), q1, sc.set(s * rr(0.6, 0.9), 1, s)); },
       (p, c) => { c.setHSL(rr(0.05, 0.13), rr(0.45, 0.75), rr(0.18, 0.42)); });
     if (li) li.castShadow = false;
   } catch (err) { console.warn('ext_dress', err); }
