@@ -192,7 +192,7 @@
       // ---------- round 2: rock, jade seal, torii gate, paper lantern ----------
       try {
         var lacq = triMat(stoneSet, { color: M.redLacquer ? M.redLacquer.color.clone() : new T.Color(0.5, 0.075, 0.045), roughness: 0.5, metalness: 0, scale: 0.9, normal: 0.55, alt: 0.6, altColor: [0.035, 0.024, 0.02], tint: [2.7, 2.7, 2.7] });
-        var mossRock = triMat(stoneSet, { color: new T.Color(0.2, 0.26, 0.12), roughness: 0.97, metalness: 0, scale: 0.9, normal: 1.2, alt: 1.35, altColor: [0.06, 0.12, 0.03], tint: [1.0, 1.0, 0.92] });
+        var mossRock = triMat(stoneSet, { color: new T.Color(0.2, 0.26, 0.12), roughness: 0.97, metalness: 0, scale: 0.9, normal: 1.2, alt: 1.15, altColor: [0.04, 0.075, 0.022], tint: [1.0, 1.0, 0.92] });
         stoneSet.users.push(function () { mossRock.color.setRGB(1, 1, 1); });
         var mkJade = function (src) {
           var j = triMat(stoneSet, { color: new T.Color(0.1, 0.42, 0.2), roughness: 0.16, metalness: 0, scale: 2.2, normal: 0.12, alt: 0, altColor: [0, 0, 0], tint: [2.6, 2.6, 2.6] });
@@ -210,7 +210,7 @@
         var ribGeo = null;
         var swap1 = swap;
         var special = {
-          rock: function (m) { return (m === M.moss || m === M.stone || m === M.darkStone) ? mossRock : m; },
+          rock: function (m) { return (m && m.isMeshStandardMaterial && !(m.userData && m.userData.jlProps)) ? mossRock : m; },
           toriiGate: function (m) { return m === M.redLacquer ? lacq : swap1(m); },
           jadeSeal: function (m) { return (m && m.isMeshPhysicalMaterial && m !== M.jade) ? mkJade(m) : swap1(m); },
           paperLantern: function (m) { return m === M.gold ? mats.gold : m; }
