@@ -1,20 +1,20 @@
 // Close-up head renders of a sister, for checking face textures without running the game.
-// usage: VAR=elder|younger HEAD=path/to/head.jpg OUT=dir [HAIR=path.png] node tools/face/view.js
+// usage: VAR=elder|younger HEAD=path/to/head.jpg OUT=dir [HAIR=path.png] [GLB=modified.glb] [SIZE=512] [UVPASS=uvcode.png] [NOHAIR=1] node tools/face/view.js
 // needs: cd tools && npm i three@0.147.0
 const { chromium } = require('playwright'); const fs = require('fs'); const path = require('path');
 const ROOT = path.join(__dirname, '..', '..'), NM = path.join(__dirname, '..', 'node_modules', 'three');
-const V = process.env.VAR || 'elder', OUT = process.env.OUT || '.';
+const V = process.env.VAR || 'elder', OUT = process.env.OUT || '.', SIZE = +process.env.SIZE || 512;
 const files = {
   '/three.js': path.join(NM, 'build/three.min.js'),
   '/GLTFLoader.js': path.join(NM, 'examples/js/loaders/GLTFLoader.js'),
   '/hair.js': path.join(ROOT, 'src/ext_hair.js'),
-  '/model.glb': path.join(ROOT, 'assets/char2', V + '.glb'),
+  '/model.glb': process.env.GLB || path.join(ROOT, 'assets/char2', V + '.glb'),
   '/head.jpg': process.env.UVPASS || process.env.HEAD || path.join(ROOT, 'assets/char2', V + '_head.jpg'),
   '/body.jpg': path.join(ROOT, 'assets/char2', V + '_body.jpg'),
   '/hair.png': process.env.HAIR || path.join(ROOT, 'assets/char2', 'elder_hair.png'),
 };
 const page = `<!doctype html><body style="margin:0;background:#888"><script src="/three.js"></script><script src="/GLTFLoader.js"></script>${process.env.NOHAIR ? "" : '<script src="/hair.js"></script>'}<script>
-const r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setSize(512,512);r.outputEncoding=THREE.sRGBEncoding;document.body.appendChild(r.domElement);
+const r=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});r.setSize(${SIZE},${SIZE});r.outputEncoding=THREE.sRGBEncoding;document.body.appendChild(r.domElement);
 const s=new THREE.Scene();s.background=new THREE.Color(0x8a8f96);s.add(new THREE.HemisphereLight(0xffffff,0x665544,0.9));
 const d=new THREE.DirectionalLight(0xfff2e0,1.6);d.position.set(0.6,1.2,2);s.add(d);
 const c=new THREE.PerspectiveCamera(22,1,0.01,50);const tl=new THREE.TextureLoader();
@@ -22,7 +22,7 @@ function tx(u){const t=tl.load(u);t.flipY=false;t.encoding=THREE.sRGBEncoding;re
 window.ready=new Promise(res=>new THREE.GLTFLoader().load('/model.glb',g=>{
   const hair=${V === 'elder'}, mh=new THREE.MeshStandardMaterial({map:tx('/hair.png'),alphaTest:0.4,side:THREE.DoubleSide,roughness:0.55});
   g.scene.traverse(o=>{if(!o.isMesh)return;const n=(o.material.name||'').toLowerCase();o.frustumCulled=false;o.userData.part=n.includes('opacity')?'hair':n.includes('head')?'head':'body';
-    if(n.includes('opacity')){if(hair&&!${!!process.env.UVPASS})o.material=mh;else o.visible=false;}
+    if(n.includes('opacity')){if(hair&&!${!!process.env.UVPASS}&&!${!!process.env.NOHAIR})o.material=mh;else o.visible=false;}
     else if(${!!process.env.UVPASS}){ if(n.includes('head')){const t=tl.load('/head.jpg');t.flipY=false;t.magFilter=t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;
         o.material=new THREE.MeshBasicMaterial({map:t,alphaTest:0.5,side:THREE.DoubleSide});} else o.visible=false; }
     else o.material=new THREE.MeshStandardMaterial({map:tx(n.includes('head')?'/head.jpg':'/body.jpg'),roughness:0.65});});
@@ -34,7 +34,7 @@ window.ready=new Promise(res=>new THREE.GLTFLoader().load('/model.glb',g=>{
 </script>`;
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
-  const p = await b.newPage({ viewport: { width: 512, height: 512 } });
+  const p = await b.newPage({ viewport: { width: SIZE, height: SIZE } });
   p.on('pageerror', e => console.log('PAGEERR', e.message)); p.on('console', m => console.log(m.text()));
   await p.route('**/*', rt => { const u = new URL(rt.request().url()); if (u.pathname === '/') return rt.fulfill({ contentType: 'text/html', body: page });
     const f = files[u.pathname]; return f ? rt.fulfill({ body: fs.readFileSync(f) }) : rt.abort(); });
