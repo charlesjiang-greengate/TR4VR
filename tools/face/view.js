@@ -8,7 +8,7 @@ const files = {
   '/three.js': path.join(NM, 'build/three.min.js'),
   '/GLTFLoader.js': path.join(NM, 'examples/js/loaders/GLTFLoader.js'),
   '/model.glb': path.join(ROOT, 'assets/char2', V + '.glb'),
-  '/head.jpg': process.env.HEAD || path.join(ROOT, 'assets/char2', V + '_head.jpg'),
+  '/head.jpg': process.env.UVPASS || process.env.HEAD || path.join(ROOT, 'assets/char2', V + '_head.jpg'),
   '/body.jpg': path.join(ROOT, 'assets/char2', V + '_body.jpg'),
   '/hair.png': process.env.HAIR || path.join(ROOT, 'assets/char2', 'elder_hair.png'),
 };
@@ -21,8 +21,11 @@ function tx(u){const t=tl.load(u);t.flipY=false;t.encoding=THREE.sRGBEncoding;re
 window.ready=new Promise(res=>new THREE.GLTFLoader().load('/model.glb',g=>{
   const hair=${V === 'elder'}, mh=new THREE.MeshStandardMaterial({map:tx('/hair.png'),alphaTest:0.4,side:THREE.DoubleSide,roughness:0.55});
   g.scene.traverse(o=>{if(!o.isMesh)return;const n=(o.material.name||'').toLowerCase();o.frustumCulled=false;
-    if(n.includes('opacity')){if(hair)o.material=mh;else o.visible=false;}
+    if(n.includes('opacity')){if(hair&&!${!!process.env.UVPASS})o.material=mh;else o.visible=false;}
+    else if(${!!process.env.UVPASS}){ if(n.includes('head')){const t=tl.load('/head.jpg');t.flipY=false;t.magFilter=t.minFilter=THREE.NearestFilter;t.generateMipmaps=false;
+        o.material=new THREE.MeshBasicMaterial({map:t,alphaTest:0.5,side:THREE.DoubleSide});} else o.visible=false; }
     else o.material=new THREE.MeshStandardMaterial({map:tx(n.includes('head')?'/head.jpg':'/body.jpg'),roughness:0.65});});
+  if(${!!process.env.UVPASS}){r.outputEncoding=THREE.LinearEncoding;s.background=new THREE.Color(0);}
   s.add(g.scene);g.scene.updateMatrixWorld(true);let h;g.scene.traverse(o=>{if(o.isBone&&/Head$/.test(o.name))h=o;});
   const p=new THREE.Vector3();h.getWorldPosition(p);window.shot=(yaw,dist)=>{c.position.set(p.x+Math.sin(yaw)*dist,p.y+0.07,p.z+Math.cos(yaw)*dist);c.lookAt(p.x,p.y+0.06,p.z);r.render(s,c);return r.domElement.toDataURL('image/png');};
   setTimeout(res,1500);}));
