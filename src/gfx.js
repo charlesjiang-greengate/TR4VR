@@ -4,6 +4,7 @@ window.JL = {};
   const T = THREE;
 
   // Art style: 'anime' (cel shading, ink outlines, painterly post, painted sky) unless ?real or window.JL_REAL
+  // chosen by the Art style links on the title screen (?real / ?anime in the address); anime by default
   JL.ANIME = !(typeof location !== 'undefined' && /[?&]real\b/.test(location.search)) && !window.JL_REAL;
   // ---------- anime: swap every MeshStandardMaterial for a banded toon material (shader hooks carried over) ----------
   let toonGrad = null, toonSoft = null; const toonList = [];

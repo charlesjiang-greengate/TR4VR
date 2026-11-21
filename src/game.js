@@ -590,6 +590,13 @@
   const pick = v => { variant = v; document.querySelectorAll('#who button').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); try { if (heroine.setVariant) heroine.setVariant(v); } catch (e) { console.warn(e); } try { localStorage.setItem('jl-hero', v); } catch (e) { } };
   document.querySelectorAll('#who button').forEach(b => b.addEventListener('click', () => pick(b.dataset.v)));
   pick(variant);
+  // art style links: plain navigation to ?anime / ?real (other query parameters kept)
+  document.querySelectorAll('#look a').forEach(a => {
+    const on = (a.dataset.s === 'anime') === !!JL.ANIME;
+    a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page');
+    const rest = location.search.replace(/^\?/, '').split('&').filter(k => k && !/^(real|anime)$/.test(k));
+    a.href = '?' + [a.dataset.s].concat(rest).join('&') + location.hash;
+  });
   $('start').addEventListener('click', () => {
     mode = 'play'; pl.yaw = Math.PI; $('title').classList.add('off'); $('hud').classList.add('on'); setObjective();
     camTarget.set(pl.pos.x, pl.pos.y + 1.45, pl.pos.z);

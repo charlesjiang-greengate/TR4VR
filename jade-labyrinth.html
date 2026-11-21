@@ -32,6 +32,12 @@ button{font:inherit;color:inherit;cursor:pointer;}
 #who button span{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);}
 #who button.on{border-color:var(--jade);background:rgba(20,60,44,.6);box-shadow:0 0 0 1px var(--jade) inset;}
 #who button:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
+#look{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);}
+#look .seg{display:inline-flex;border:1px solid rgba(243,233,214,.28);border-radius:2px;background:var(--veil);backdrop-filter:blur(6px);}
+#look a{padding:7px 14px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--paper-dim);text-decoration:none;}
+#look a+a{border-left:1px solid rgba(243,233,214,.28);}
+#look a.on{color:var(--paper);background:rgba(20,60,44,.6);box-shadow:0 0 0 1px var(--jade) inset;}
+#look a:focus-visible{outline:2px solid var(--gold);outline-offset:2px;}
 .go{align-self:flex-start;margin-top:6px;background:var(--vermilion);border:1px solid rgba(255,220,170,.35);color:#fff3e2;padding:13px 30px 12px;font-size:17px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;border-radius:2px;box-shadow:0 8px 30px rgba(200,50,28,.35);transition:transform .15s,background .15s;}
 .go:hover{background:#dd3d24;transform:translateY(-1px);}
 .go:focus-visible{outline:2px solid var(--gold);outline-offset:3px;}
@@ -88,6 +94,7 @@ button{font:inherit;color:inherit;cursor:pointer;}
       <h1>Jade Labyrinth</h1>
       <p class="lede">Dusk over the Wuling ranges. Two sisters stand under the first vermilion gate of a temple maze that no map admits to. Three jade seals open the way to the dragon. Choose who goes in.</p>
       <div id="who" role="radiogroup" aria-label="Choose your explorer"><button type="button" role="radio" data-v="elder" aria-checked="true"><b>Elder sister</b><span>Taller · white No. 98 jersey</span></button><button type="button" role="radio" data-v="younger" aria-checked="false"><b>Younger sister</b><span>Smaller · pink hoodie</span></button></div>
+      <div id="look"><span id="look-l">Art style</span><nav class="seg" aria-labelledby="look-l"><a href="?anime" data-s="anime">Anime</a><a href="?real" data-s="real">Realistic</a></nav></div>
       <ul class="keys"><li><b>WASD</b> move</li><li><b>Mouse</b> look</li><li><b>Space</b> jump · climb</li><li><b>E</b> use</li><li><b>Shift</b> walk</li></ul>
       <button id="start" class="go" type="button">Enter the labyrinth</button>
     </div>
@@ -1988,6 +1995,7 @@ window.JL = {};
   const T = THREE;
 
   // Art style: 'anime' (cel shading, ink outlines, painterly post, painted sky) unless ?real or window.JL_REAL
+  // chosen by the Art style links on the title screen (?real / ?anime in the address); anime by default
   JL.ANIME = !(typeof location !== 'undefined' && /[?&]real\b/.test(location.search)) && !window.JL_REAL;
   // ---------- anime: swap every MeshStandardMaterial for a banded toon material (shader hooks carried over) ----------
   let toonGrad = null, toonSoft = null; const toonList = [];
@@ -5135,6 +5143,13 @@ window.createHeroine2 = function (THREE) {
   const pick = v => { variant = v; document.querySelectorAll('#who button').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); try { if (heroine.setVariant) heroine.setVariant(v); } catch (e) { console.warn(e); } try { localStorage.setItem('jl-hero', v); } catch (e) { } };
   document.querySelectorAll('#who button').forEach(b => b.addEventListener('click', () => pick(b.dataset.v)));
   pick(variant);
+  // art style links: plain navigation to ?anime / ?real (other query parameters kept)
+  document.querySelectorAll('#look a').forEach(a => {
+    const on = (a.dataset.s === 'anime') === !!JL.ANIME;
+    a.classList.toggle('on', on); if (on) a.setAttribute('aria-current', 'page');
+    const rest = location.search.replace(/^\?/, '').split('&').filter(k => k && !/^(real|anime)$/.test(k));
+    a.href = '?' + [a.dataset.s].concat(rest).join('&') + location.hash;
+  });
   $('start').addEventListener('click', () => {
     mode = 'play'; pl.yaw = Math.PI; $('title').classList.add('off'); $('hud').classList.add('on'); setObjective();
     camTarget.set(pl.pos.x, pl.pos.y + 1.45, pl.pos.z);
