@@ -75,6 +75,15 @@ m = np.zeros(tex.shape[:2], np.float32); cv2.fillPoly(m, [poly], 1.0); m *= vali
 m = cv2.erode(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * int(o['feather']) + 1,) * 2)); m = cv2.GaussianBlur(m, (0, 0), o['feather'] * 0.6)
 m = np.minimum(m, cv2.GaussianBlur(cv2.erode(valid, np.ones((5, 5), np.uint8)), (0, 0), 2) * 2 - 1).clip(0, 1)
 
+if o['forehead'] > 0:   # raise the hairline: replace the stock fringe above the brows by skin before blending the photo in
+    n = int(o['forehead']); top = np.argmax(m > 0.5, axis=0); has = (m > 0.5).any(0) & (top < c[1] - 40); rows = np.arange(1024)[:, None]
+    F = np.clip((rows - (top[None] - n)) / (n * 0.3), 0, 1) * np.clip((top[None] + 60 - rows) / 12.0, 0, 1) * has[None]
+    F = cv2.GaussianBlur(F.astype(np.float32), (0, 0), 4)
+    skin = np.median(tex[m > 0.9], 0); sl = skin.mean(); lum = cv2.GaussianBlur(tex, (0, 0), 2).mean(2)
+    k = (F * np.clip((0.92 * sl - lum) / (0.2 * sl), 0, 1))[..., None]
+    grain = tex - cv2.GaussianBlur(tex, (0, 0), 3)
+    tex = tex * (1 - k) + (skin * (1 - 0.10 * np.clip((top[None] - rows) / n, 0, 1)[..., None]) + grain * 0.3) * k
+
 def low(img, mk, s):
     num = cv2.GaussianBlur(img * mk[..., None], (0, 0), s); den = cv2.GaussianBlur(mk, (0, 0), s)[..., None]
     return num / np.maximum(den, 1e-4)
@@ -87,14 +96,6 @@ base = Tl * gain * (1 - o['lowmix']) + Wl * o['lowmix']
 res = np.clip(base * (W / np.maximum(Wl, 1e-3)), 0, 1)
 final = tex_t * (1 - m[..., None]) + res * m[..., None]
 
-if o['forehead'] > 0:   # raise the hairline: smear the top of the photo forehead upwards over the stock fringe
-    n = int(o['forehead']); top = np.argmax(m > 0.85, axis=0); has = (m > 0.85).any(0); src = final.copy()
-    cols = np.nonzero(has)[0]; rows = np.arange(1024)[:, None]
-    smear = cv2.GaussianBlur(final[np.clip(top + 4, 0, 1023), np.arange(1024)][None].repeat(1024, 0), (0, 0), 6)
-    k = np.clip((top[None] + 6 - rows) / 6.0, 0, 1) * np.clip((rows - (top[None] - n)) / (n * 0.35), 0, 1) * has[None]   # 1 between hairline and mask top
-    k = cv2.GaussianBlur((k * (top[None] < c[1])).astype(np.float32), (0, 0), 3)[..., None]
-    shade = 1 - 0.18 * np.clip((top[None] - rows) / n, 0, 1)[..., None]                          # a little darker towards the hair
-    final = final * (1 - k) + smear * shade * k
 if var == 'elder':   # paint out the stock model's ear plugs, neck tattoo and necklace pendant
     u8 = (final * 255).astype(np.uint8); mk = np.zeros((1024, 1024), np.uint8)
     for cx, cy in [(262, 412), (765, 412)]: cv2.circle(mk, (cx, cy), 11, 255, -1)
