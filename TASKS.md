@@ -101,8 +101,7 @@ HTML=../jade-labyrinth.html OUT=/tmp W=640 H=360 \
   Tip: Microsoft Rocketbox (MIT, raw.githubusercontent.com/microsoft/Microsoft-Rocketbox) has realistic adult and child
   avatars incl. East Asian women/girls plus animations (FBX → convert to GLB with npm `fbx2gltf`). The integrator has one
   worker trying this already in `src/heroine2.js`; coordinate by using `src/heroine3.js` + `window.createHeroine3` instead.
-  Needs a real skinned, textured human model with idle/run/jump/fall/climb animation.
-  (Superseded: the owner has since asked for the faces to resemble their daughters; see `NEXT.md`.)
+  Needs a real skinned, textured human model with idle/run/jump/fall/climb animation; no likeness of real people.
 
 ## Task M — character movement (dedicated session, final push)
 

@@ -82,12 +82,10 @@ window.createHeroine2 = function (THREE) {
       if (!o.isMesh) return;
       o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
       var mn = (o.material && o.material.name || '').toLowerCase();
-      o.userData.part = mn.indexOf('opacity') >= 0 ? 'hair' : mn.indexOf('head') >= 0 ? 'head' : 'body';
       if (mn.indexOf('opacity') >= 0) { if (mHair) { o.material = mHair; o.receiveShadow = false; } else o.visible = false; }
       else if (mn.indexOf('head') >= 0) o.material = mHead;
       else o.material = mBody;
     });
-    if (window.JL_HAIR) { try { window.JL_HAIR(name, root, THREE); } catch (e) { console.warn('heroine2: hair', e); } }
     var bipNode = root.getObjectByName(v.bip);
     var yScale = bipNode ? bipNode.position.y / CLIP_BIP_Y : 1;
     I.mixer = new THREE.AnimationMixer(root);
