@@ -63,8 +63,10 @@ and `assets/<id>/**`, write a `handoff/<id>.md`, and the integrator merges. Each
      directory and need adjusting); reference sheets are in `docs/animation-sheets/`.
    - Dead state, hurt reaction and foot-slide matching are still rough. `extras/patches/` holds an unmerged
      knee-buckle idea for the dead state.
-2. **Faces and likeness.** The sisters should read as East Asian girls. Options: a different CC0 / MIT head or avatar
-   set, or repainting the head textures. Do not attempt a likeness of real people.
+2. **Faces and likeness.** The sisters are the owner's daughters, and the owner wants their faces to resemble them
+   (consented family use; the repo is private and the game is shared with family only). Route: the owner builds each
+   head in KeenTools FaceBuilder and exports it (see `docs/facebuilder-checklist.md`); a session fits it onto the
+   existing body and skeleton. Keep source photos out of git; commit only the finished, downscaled textures.
 3. **Hands and contact.** Fingers do not curl over ledges; feet are not planted on stepping stones or slopes.
 4. **Map realism.** Plaster walls are still uniform; crates and a few props look placeholder; add parallax or
    displacement on the stone base and more variation between corridors. A cheap screen-space reflection on wet
