@@ -3,6 +3,54 @@ window.JL = {};
   'use strict';
   const T = THREE;
 
+  // Art style: 'anime' (cel shading, ink outlines, painterly post, painted sky) unless ?real or window.JL_REAL
+  JL.ANIME = !(typeof location !== 'undefined' && /[?&]real\b/.test(location.search)) && !window.JL_REAL;
+  // ---------- anime: swap every MeshStandardMaterial for a banded toon material (shader hooks carried over) ----------
+  let toonGrad = null, toonSoft = null; const toonList = [];
+  function toonOf(m) {
+    if (!m || !m.isMeshStandardMaterial) return m;
+    if (m.userData.toon) return m.userData.toon;
+    if (!toonGrad) {
+      const d = new Uint8Array([92, 92, 92, 255, 168, 168, 168, 255, 228, 228, 228, 255, 255, 255, 255, 255]);
+      toonGrad = new T.DataTexture(d, 4, 1); toonGrad.minFilter = toonGrad.magFilter = T.NearestFilter; toonGrad.needsUpdate = true;
+    }
+    if (!toonSoft) {   // faces: almost flat, one soft step
+      const d = new Uint8Array([205, 205, 205, 255, 235, 235, 235, 255, 255, 255, 255, 255]);
+      toonSoft = new T.DataTexture(d, 3, 1); toonSoft.minFilter = toonSoft.magFilter = T.NearestFilter; toonSoft.needsUpdate = true;
+    }
+    const t = new T.MeshToonMaterial({ gradientMap: m.userData.toonSoft ? toonSoft : toonGrad });
+    t.name = m.name; t.userData.src = m; m.userData.toon = t;
+    const own = (m.onBeforeCompile && m.onBeforeCompile.toString().indexOf('{}') < 0) ? m.onBeforeCompile : null;
+    // flatten photo texture detail halfway toward the texture's own average colour (lowest mip level) = painted look
+    t.onBeforeCompile = function (sh, r) {
+      if (own) own.call(this, sh, r);
+      const k = m.userData.keepDetail ? '0.0' : '0.5';
+      let f = sh.fragmentShader;
+      const j = f.indexOf('vec3 jlC =');                 // triplanar props (ext_props): flatten the blended sample itself
+      if (j >= 0) { const e = f.indexOf(';', j) + 1; f = f.slice(0, e) + '\n jlC = mix(jlC, texture2D(jlD, vec2(0.5), 12.0).rgb, ' + k + ');' + f.slice(e); }
+      else f = f.replace('#include <color_fragment>', '#ifdef USE_MAP\n diffuseColor.rgb = mix(diffuseColor.rgb, diffuse * texture2D(map, vUv, 12.0).rgb, ' + k + ');\n#endif\n#include <color_fragment>');
+      sh.fragmentShader = f;
+    };
+    t.customProgramCacheKey = function () { return 'toon-' + (m.userData.keepDetail ? 'k-' : '') + (m.userData.toonSoft ? 's-' : '') + (m.customProgramCacheKey ? m.customProgramCacheKey() : ''); };
+    toonSync(t); toonList.push(t); return t;
+  }
+  function toonSync(t) {
+    const m = t.userData.src;
+    if (t.map !== m.map || t.emissiveMap !== m.emissiveMap || t.alphaMap !== m.alphaMap || t.vertexColors !== m.vertexColors) {
+      t.map = m.map; t.emissiveMap = m.emissiveMap; t.alphaMap = m.alphaMap; t.vertexColors = m.vertexColors; t.needsUpdate = true;
+    }
+    // metals read as flat painted colour: lift them a little since there is no reflection any more
+    t.color.copy(m.color); if (m.metalness > 0.5) t.color.multiplyScalar(1.25);
+    t.emissive.copy(m.emissive); t.emissiveIntensity = m.emissiveIntensity;
+    t.alphaTest = m.alphaTest; t.transparent = m.transparent; t.opacity = m.opacity; t.side = m.side;
+    t.visible = m.visible; t.depthWrite = m.depthWrite; t.polygonOffset = m.polygonOffset;
+    t.polygonOffsetFactor = m.polygonOffsetFactor; t.polygonOffsetUnits = m.polygonOffsetUnits;
+  }
+  JL.toonify = function (root) {
+    root.traverse(o => { if (o.isMesh && o.material) o.material = Array.isArray(o.material) ? o.material.map(toonOf) : toonOf(o.material); });
+  };
+  JL.toonSync = function () { for (let i = 0; i < toonList.length; i++) toonSync(toonList[i]); };
+
   JL.rng = function (seed) {
     let a = seed >>> 0;
     return function () {
@@ -177,6 +225,30 @@ window.JL = {};
   };
 
   // ---------- sky ----------
+  // painted late-afternoon sky: clear gradient, big soft cumulus with banded light/shadow sides
+  const ANIME_SKY_FS = `
+    varying vec3 vD; uniform vec3 sunDir; uniform float time;
+    float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    float n(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
+    float fbm(vec2 p){ float a=.5,s=0.; for(int i=0;i<5;i++){ s+=a*n(p); p=p*2.03+7.1; a*=.5; } return s; }
+    void main(){
+      vec3 d=normalize(vD); float y=max(d.y,0.);
+      vec3 zen=vec3(0.10,0.32,0.78), mid=vec3(0.36,0.62,0.95), hor=vec3(0.95,0.90,0.80);
+      vec3 col=mix(hor,mid,smoothstep(0.,0.25,y)); col=mix(col,zen,smoothstep(0.2,0.9,y));
+      float s=max(dot(d,sunDir),0.);
+      col=mix(col,vec3(1.25,1.05,0.75),pow(s,8.)*0.45);
+      vec2 cp=d.xz/(d.y+0.18)*0.9+vec2(time*0.003,0.);
+      float base=fbm(cp*0.9)+0.35*fbm(cp*2.7+3.1);
+      float c=smoothstep(0.78,0.86,base)*smoothstep(0.0,0.18,d.y)*(1.-smoothstep(0.75,0.95,d.y));
+      float lit=fbm(cp*0.9+sunDir.xz*0.35)-fbm(cp*0.9);
+      float band=step(-0.015,lit);
+      vec3 cLit=vec3(1.30,1.22,1.08), cSh=vec3(0.62,0.66,0.86), cRim=vec3(1.45,1.25,0.95);
+      vec3 cc=mix(cSh,cLit,band); cc=mix(cc,cRim,smoothstep(0.86,0.80,base)*band*0.6);
+      col=mix(col,cc,c);
+      col+=vec3(1.0,0.9,0.7)*smoothstep(0.9993,0.9997,s)*3.;
+      if(d.y<0.) col=mix(col,vec3(0.45,0.55,0.55),smoothstep(0.,-0.15,d.y));
+      gl_FragColor=vec4(col,1.);
+    }`;
   JL.makeSky = function (sunDir) {
     const mat = new T.ShaderMaterial({
       side: T.BackSide, depthWrite: false,
@@ -202,6 +274,7 @@ window.JL = {};
           gl_FragColor=vec4(col*0.9,1.);
         }`
     });
+    if (JL.ANIME) mat.fragmentShader = ANIME_SKY_FS;
     const mesh = new T.Mesh(new T.SphereGeometry(400, 32, 16), mat);
     mesh.frustumCulled = false; mesh.renderOrder = -10;
     return mesh;
@@ -305,6 +378,48 @@ window.JL = {};
       gl_FragColor=vec4(c,1.);
     }`;
 
+  const ANIME_FS = `
+    precision highp float;
+    uniform sampler2D tDiffuse, tDepth; uniform float uTime, uExposure, uHurt, uFade, uNear, uFar; uniform vec2 uRes;
+    varying vec2 vUv;
+    vec3 tone(vec3 x){ x*=uExposure*0.95; return 1.-exp(-x*1.1); }
+    float ld(vec2 uv){ float z=texture2D(tDepth,uv).x; return uNear*uFar/(uFar-z*(uFar-uNear)); }
+    void main(){
+      vec2 px=1./uRes; float dc=ld(vUv);
+      // ---- painterly: 4-quadrant Kuwahara, weaker close to the camera so faces keep their features ----
+      vec3 m[4]; vec3 s2[4];
+      for(int q=0;q<4;q++){ m[q]=vec3(0.); s2[q]=vec3(0.); }
+      for(int j=0;j<=2;j++) for(int i=0;i<=2;i++){
+        vec2 o=vec2(float(i),float(j))*1.5*px;
+        vec3 a=tone(texture2D(tDiffuse,vUv+vec2(-o.x,-o.y)).rgb), b=tone(texture2D(tDiffuse,vUv+vec2(o.x,-o.y)).rgb);
+        vec3 c=tone(texture2D(tDiffuse,vUv+vec2(-o.x,o.y)).rgb), e=tone(texture2D(tDiffuse,vUv+vec2(o.x,o.y)).rgb);
+        m[0]+=a; s2[0]+=a*a; m[1]+=b; s2[1]+=b*b; m[2]+=c; s2[2]+=c*c; m[3]+=e; s2[3]+=e*e;
+      }
+      vec3 best=vec3(0.); float bv=1e9;
+      for(int q=0;q<4;q++){ vec3 mu=m[q]/9.; vec3 v=s2[q]/9.-mu*mu; float vv=v.r+v.g+v.b; if(vv<bv){ bv=vv; best=mu; } }
+      vec3 c0=tone(texture2D(tDiffuse,vUv).rgb);
+      vec3 c=mix(c0,best,mix(0.35,1.0,smoothstep(3.,12.,dc)));
+      // ---- soft painted grade: clean saturation, cool blue-violet shadows, warm light ----
+      float l=dot(c,vec3(0.2126,0.7152,0.0722));
+      c=mix(vec3(l),c,1.18);
+      c=mix(c,c*vec3(0.86,0.92,1.16)+vec3(0.015,0.02,0.05),(1.-smoothstep(0.05,0.5,l))*0.7);
+      c=mix(c,c*vec3(1.05,1.01,0.93),smoothstep(0.55,1.,l)*0.5);
+      c=pow(max(c,0.),vec3(1./2.2));
+      // ---- ink outline: relative depth discontinuities ----
+      float e=0.;
+      for(int k=0;k<4;k++){
+        vec2 o=(k==0?vec2(1.,0.):k==1?vec2(-1.,0.):k==2?vec2(0.,1.):vec2(0.,-1.))*1.25*px;
+        float dn=ld(vUv+o); e=max(e,(dn-dc)/max(dc,0.1));
+      }
+      float line=smoothstep(0.035,0.09,e)*(1.-smoothstep(30.,80.,dc));
+      c=mix(c,vec3(0.16,0.11,0.10),line*0.85);
+      vec2 d=vUv-0.5; float r2=dot(d,d);
+      c*=mix(0.86,1.,1.-smoothstep(0.2,0.9,r2*1.6));
+      c=mix(c,vec3(0.5,0.02,0.02),uHurt*smoothstep(0.05,0.5,r2)*0.8);
+      c*=uFade;
+      gl_FragColor=vec4(c,1.);
+    }`;
+
   JL.Post = function (renderer, sun, lowQ) {
     const self = this;
     const cam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
@@ -330,14 +445,15 @@ window.JL = {};
       }
     });
     this.final = new T.ShaderMaterial({
-      vertexShader: QUAD_VS, fragmentShader: FINAL_FS, depthTest: false, depthWrite: false,
-      uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uExposure: { value: 1.0 }, uHurt: { value: 0 }, uFade: { value: 1 }, uRes: { value: new T.Vector2() } }
+      vertexShader: QUAD_VS, fragmentShader: JL.ANIME ? ANIME_FS : FINAL_FS, depthTest: false, depthWrite: false,
+      uniforms: { tDiffuse: { value: null }, tDepth: { value: null }, uNear: { value: 0.1 }, uFar: { value: 900 }, uTime: { value: 0 }, uExposure: { value: 1.0 }, uHurt: { value: 0 }, uFade: { value: 1 }, uRes: { value: new T.Vector2() } }
     });
+    if (JL.ANIME) { const u = this.composite.uniforms; u.uAO.value = 0.35; u.uFogCol.value.setRGB(0.10, 0.14, 0.20); u.uFogAmt.value = 0.45; u.uSunCol.value.setRGB(1.0, 0.85, 0.62).multiplyScalar(1.4); }
     this.fxaa = new T.ShaderMaterial({
       vertexShader: T.FXAAShader.vertexShader, fragmentShader: T.FXAAShader.fragmentShader, depthTest: false, depthWrite: false,
       uniforms: { tDiffuse: { value: null }, resolution: { value: new T.Vector2() } }
     });
-    this.bloom = new T.UnrealBloomPass(new T.Vector2(256, 256), 0.55, 0.6, 1.0);
+    this.bloom = new T.UnrealBloomPass(new T.Vector2(256, 256), JL.ANIME ? 0.35 : 0.55, 0.6, 1.0);
     const hf = rt => { rt.texture.type = T.HalfFloatType; };
     hf(this.bloom.renderTargetBright); this.bloom.renderTargetsHorizontal.forEach(hf); this.bloom.renderTargetsVertical.forEach(hf);
 
@@ -360,6 +476,7 @@ window.JL = {};
       pass(self.composite, self.rtA);
       self.bloom.render(renderer, null, self.rtA, 0.016, false);
       self.final.uniforms.tDiffuse.value = self.rtA.texture; self.final.uniforms.uTime.value = time;
+      self.final.uniforms.tDepth.value = self.rtScene.depthTexture; self.final.uniforms.uNear.value = camera.near; self.final.uniforms.uFar.value = camera.far;
       pass(self.final, self.rtL);
       self.fxaa.uniforms.tDiffuse.value = self.rtL.texture;
       pass(self.fxaa, null);
@@ -508,7 +625,7 @@ window.JL = {};
     TL.load(base + 'sky.jpg', t => {
       t.encoding = T.sRGBEncoding; t.wrapS = T.RepeatWrapping; t.wrapT = T.ClampToEdgeWrapping;
       t.minFilter = T.LinearFilter; t.magFilter = T.LinearFilter; t.generateMipmaps = false;
-      const old = sky.material; sky.material = skyMat(t, true, 0.95, 4.0, 1.0); if (old && old.dispose) old.dispose();
+      if (!JL.ANIME) { const old = sky.material; sky.material = skyMat(t, true, 0.95, 4.0, 1.0); if (old && old.dispose) old.dispose(); }
       if (!hdrDone) { try { bakeEnv(skyMat(t, true, 0.9, 4.0, 0.25)); } catch (e) { console.warn('env jpg', e); } }
     }, undefined, () => { });
     if (T.RGBELoader) {

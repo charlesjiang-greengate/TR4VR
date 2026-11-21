@@ -72,6 +72,10 @@
   sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.06;
   scene.add(sun, sun.target);
   scene.add(new T.HemisphereLight(0x6f8fb0, 0x2a2018, 0.35));
+  if (JL.ANIME) {   // toon materials ignore the environment map: replace that fill with soft sky/ground light, warmer brighter sun
+    scene.add(new T.HemisphereLight(0xa9c6ee, 0x8a7a5a, 1.6)); scene.add(new T.AmbientLight(0xfff2e0, 0.35));
+    sun.color.setRGB(1.0, 0.86, 0.66); sun.intensity = 6.0;
+  }
   if (JL.loadRealAssets) { try { JL.loadRealAssets(renderer, scene, M, sky, sunDir); } catch (e) { console.warn(e); } }
 
   // ---------- geometry builder ----------
@@ -560,7 +564,7 @@
       const s = sorted[i], L = plights[i]; if (!s) { L.intensity = 0; continue; }
       L.position.copy(s.pos); L.color.copy(s.color);
       const fl = 0.85 + 0.15 * Math.sin(time * 9 + s.ph) * Math.sin(time * 5.3 + s.ph * 2);
-      L.intensity = s.power * fl * (1 - clamp((Math.sqrt(s.d) - 14) / 8, 0, 1));
+      L.intensity = s.power * fl * (1 - clamp((Math.sqrt(s.d) - 14) / 8, 0, 1)) * (JL.ANIME ? 0.45 : 1);
     }
   }
 
@@ -604,6 +608,7 @@
     if (!window.JL_MANUAL) requestAnimationFrame(frame);
     const rdt = Math.max(0, (now - last) / 1000); last = now; const dt = Math.min(0.05, rdt); time += dt;
     updatePlayer(dt); updateEntities(dt);
+    if (JL.ANIME) { if (((window.__frames | 0) % 30) === 0 || window.JL_MANUAL === 1) JL.toonify(scene); JL.toonSync(); }
     for (const f of extUpd) { try { f(dt, time, pl, camera); } catch (e) { if (!f.err) { f.err = 1; console.warn('ext update', e); } } }
     heroine.group.position.copy(pl.pos); heroine.group.rotation.y = pl.yaw;
     heroine.group.visible = !(pl.inv > 0 && pl.dead === 0 && Math.sin(time * 40) > 0.3);
