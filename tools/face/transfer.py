@@ -6,7 +6,7 @@ warped into texture space (piecewise affine, fold-free), its detail and part of 
 head is shifted towards that tone and the irises are made dark brown. The eye contour is not taken from the detector on
 the render: the photo's eye corners and lids are pinned to the eye openings measured on the render (visible eyeball).
 Also writes OUT_gain.json (skin tone gain, reused for the body texture).
-options (defaults): sigma=18 lowmix=0.6 shrink=1.0 task=face_landmarker.task base=assets/char2/VAR_head.jpg"""
+options (defaults): sigma=18 lowmix=0.6 shrink=0.94 feather=12 forehead=0 (px of texture to raise the hairline by) task=face_landmarker.task base=assets/char2/VAR_head.jpg"""
 import sys, os, json, numpy as np, cv2
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from facelib import *
@@ -15,7 +15,7 @@ from skimage.transform import PiecewiseAffineTransform, warp
 from scipy.spatial import Delaunay, ConvexHull
 
 var, photo, rdir, out = sys.argv[1:5]
-o = dict(sigma=18.0, lowmix=0.6, shrink=1.0, task='face_landmarker.task', base=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'assets', 'char2', var + '_head.jpg'))
+o = dict(forehead=0.0, feather=12.0, sigma=18.0, lowmix=0.6, shrink=0.94, task='face_landmarker.task', base=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'assets', 'char2', var + '_head.jpg'))
 for a in sys.argv[5:]:
     k, v = a.split('='); o[k] = type(o[k])(v)
 
@@ -60,12 +60,20 @@ T, P = T[keep], P[keep]
 
 tex = np.array(Image.open(o['base']).convert('RGB')).astype(np.float32) / 255; stock = tex.copy()
 ph = np.array(Image.open(photo).convert('RGB')).astype(np.float32) / 255
-tf = PiecewiseAffineTransform(); tf.estimate(T, P)
+# extend the warp a little beyond the landmark hull (ring of points carried by the global affine fit + the local offset),
+# so the feathered edge of the mask still has photo under it
+hv = ConvexHull(T).vertices; c = T.mean(0); Aff = np.linalg.lstsq(np.c_[T, np.ones(len(T))], P, rcond=None)[0]
+ringT = c + (T[hv] - c) * 1.25; ringP = np.c_[ringT, np.ones(len(hv))] @ Aff + (P[hv] - np.c_[T[hv], np.ones(len(hv))] @ Aff)
+tf = PiecewiseAffineTransform(); tf.estimate(np.vstack([T, ringT]), np.vstack([P, ringP]))
 W = warp(ph, tf, output_shape=tex.shape[:2], order=3, cval=-1)
 valid = (W[..., 0] >= 0).astype(np.float32); W[valid == 0] = 0
-hull = T[ConvexHull(T).vertices]; c = T.mean(0); poly = (c + (hull - c) * o['shrink']).astype(np.int32)
+hull = T[ConvexHull(T).vertices]; c = T.mean(0)
+# jaw side of the outline is pulled in (the photo there is neck / collar / background), the forehead side is kept
+poly = np.array([c + (h - c) * (o['shrink'] if h[1] > c[1] else 1.0) for h in hull]).astype(np.int32)
 m = np.zeros(tex.shape[:2], np.float32); cv2.fillPoly(m, [poly], 1.0); m *= valid
-m = cv2.erode(m, np.ones((9, 9), np.uint8)); m = cv2.GaussianBlur(m, (0, 0), 14)
+# feather inside the warped area: where there is no photo a mask would leave a dark hard edge
+m = cv2.erode(m, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * int(o['feather']) + 1,) * 2)); m = cv2.GaussianBlur(m, (0, 0), o['feather'] * 0.6)
+m = np.minimum(m, cv2.GaussianBlur(cv2.erode(valid, np.ones((5, 5), np.uint8)), (0, 0), 2) * 2 - 1).clip(0, 1)
 
 def low(img, mk, s):
     num = cv2.GaussianBlur(img * mk[..., None], (0, 0), s); den = cv2.GaussianBlur(mk, (0, 0), s)[..., None]
@@ -79,6 +87,14 @@ base = Tl * gain * (1 - o['lowmix']) + Wl * o['lowmix']
 res = np.clip(base * (W / np.maximum(Wl, 1e-3)), 0, 1)
 final = tex_t * (1 - m[..., None]) + res * m[..., None]
 
+if o['forehead'] > 0:   # raise the hairline: smear the top of the photo forehead upwards over the stock fringe
+    n = int(o['forehead']); top = np.argmax(m > 0.85, axis=0); has = (m > 0.85).any(0); src = final.copy()
+    cols = np.nonzero(has)[0]; rows = np.arange(1024)[:, None]
+    smear = cv2.GaussianBlur(final[np.clip(top + 4, 0, 1023), np.arange(1024)][None].repeat(1024, 0), (0, 0), 6)
+    k = np.clip((top[None] + 6 - rows) / 6.0, 0, 1) * np.clip((rows - (top[None] - n)) / (n * 0.35), 0, 1) * has[None]   # 1 between hairline and mask top
+    k = cv2.GaussianBlur((k * (top[None] < c[1])).astype(np.float32), (0, 0), 3)[..., None]
+    shade = 1 - 0.18 * np.clip((top[None] - rows) / n, 0, 1)[..., None]                          # a little darker towards the hair
+    final = final * (1 - k) + smear * shade * k
 if var == 'elder':   # paint out the stock model's ear plugs, neck tattoo and necklace pendant
     u8 = (final * 255).astype(np.uint8); mk = np.zeros((1024, 1024), np.uint8)
     for cx, cy in [(262, 412), (765, 412)]: cv2.circle(mk, (cx, cy), 11, 255, -1)
